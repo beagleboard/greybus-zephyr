@@ -9,8 +9,12 @@
 
 #include <stdint.h>
 
-extern struct gb_driver gb_log_driver;
-
+/**
+ * Send greybus log message
+ *
+ * @param len: size of string excluding NULL terminator.
+ * @param log: UTF-8 string.
+ */
 void gb_log_send_log(uint16_t len, const char *log);
 
 #endif // _GREYBUS_LOG_H_

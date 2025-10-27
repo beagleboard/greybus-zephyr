@@ -25,7 +25,7 @@ void gb_log_send_log(uint16_t len, const char *log)
 {
 	struct gb_log_send_log_request *req_data;
 	struct gb_message *msg =
-		gb_message_request_alloc(sizeof(*req_data) + len, GB_LOG_TYPE_SEND_LOG, false);
+		gb_message_request_alloc(sizeof(*req_data) + len + 1, GB_LOG_TYPE_SEND_LOG, false);
 
 	if (!msg) {
 		return;
@@ -33,8 +33,10 @@ void gb_log_send_log(uint16_t len, const char *log)
 
 	req_data = (struct gb_log_send_log_request *)msg->payload;
 
-	req_data->len = sys_cpu_to_le16(len);
+	/* Include NULL terminator */
+	req_data->len = sys_cpu_to_le16(len + 1);
 	memcpy(req_data->msg, log, len);
+	req_data->msg[len] = '\0';
 
 	gb_transport_message_send(msg, GREYBUS_LOG_CPORT);
 	gb_message_dealloc(msg);
