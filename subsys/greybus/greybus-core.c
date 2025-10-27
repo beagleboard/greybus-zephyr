@@ -242,7 +242,7 @@ int gb_notify(uint16_t cport, enum gb_event event)
 	switch (event) {
 	case GB_EVT_CONNECTED:
 		if (cport_ptr->driver->connected) {
-			cport_ptr->driver->connected(cport_ptr->priv);
+			cport_ptr->driver->connected(cport_ptr->priv, cport);
 		}
 		break;
 

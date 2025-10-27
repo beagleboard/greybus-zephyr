@@ -226,34 +226,6 @@ free_msg:
 	gb_message_dealloc(req);
 }
 
-/**
- * @brief Protocol initialization function.
- *
- * This function perform the protocto initialization function, such as open
- * the cooperation device driver, launch threads, create buffers etc.
- */
-static int gb_uart_init(const void *priv, uint16_t cport)
-{
-	const struct device *dev = priv;
-
-	uart_irq_callback_user_data_set(dev, uart_irq_cb, UINT_TO_POINTER(cport));
-	uart_irq_rx_enable(dev);
-
-	return 0;
-}
-
-/**
- * @brief Protocol exit function.
- *
- * This function can be called when protocol terminated.
- */
-static void gb_uart_exit(const void *priv)
-{
-	const struct device *dev = priv;
-
-	uart_irq_rx_disable(dev);
-}
-
 static void gb_uart_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
 	const struct device *dev = priv;
@@ -276,8 +248,24 @@ static void gb_uart_handler(const void *priv, struct gb_message *msg, uint16_t c
 	}
 }
 
+static void gb_uart_connected(const void *priv, uint16_t cport)
+{
+	const struct device *dev = priv;
+
+	uart_irq_callback_user_data_set(dev, uart_irq_cb, UINT_TO_POINTER(cport));
+	uart_irq_rx_enable(dev);
+}
+
+static void gb_uart_disconnected(const void *priv)
+{
+
+	const struct device *dev = priv;
+
+	uart_irq_rx_disable(dev);
+}
+
 struct gb_driver gb_uart_driver = {
-	.init = gb_uart_init,
-	.exit = gb_uart_exit,
 	.op_handler = gb_uart_handler,
+	.connected = gb_uart_connected,
+	.disconnected = gb_uart_disconnected,
 };

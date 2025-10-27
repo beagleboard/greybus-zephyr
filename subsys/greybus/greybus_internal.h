@@ -25,7 +25,7 @@ struct gb_driver {
 	 * stored in bundle should be freed and struct device should be closed.
 	 */
 	void (*exit)(const void *priv);
-	void (*connected)(const void *priv);
+	void (*connected)(const void *priv, uint16_t cport);
 	void (*disconnected)(const void *priv);
 
 	gb_operation_handler_t op_handler;

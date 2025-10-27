@@ -19,7 +19,28 @@ static const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(euart0));
 
 struct gb_msg_with_cport gb_transport_get_message(void);
 
-ZTEST_SUITE(greybus_uart_tests, NULL, NULL, NULL, NULL, NULL);
+static void *cport_connected(void)
+{
+	struct gb_msg_with_cport resp;
+	struct gb_control_connected_request *req_data;
+	struct gb_message *msg =
+		gb_message_request_alloc(sizeof(*req_data), GB_CONTROL_TYPE_CONNECTED, false);
+
+	req_data = (struct gb_control_connected_request *)msg->payload;
+	req_data->cport_id = sys_cpu_to_le16(1);
+
+	greybus_rx_handler(0, msg);
+	resp = gb_transport_get_message();
+	zassert_equal(resp.cport, 0, "Invalid Cport");
+	zassert(gb_message_is_success(resp.msg), "Connected request failed");
+	zassert_equal(gb_message_payload_len(resp.msg), 0, "Invalid response");
+
+	gb_message_dealloc(resp.msg);
+
+	return NULL;
+}
+
+ZTEST_SUITE(greybus_uart_tests, NULL, cport_connected, NULL, NULL, NULL);
 
 ZTEST(greybus_uart_tests, test_cport_count)
 {
