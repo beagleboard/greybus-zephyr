@@ -1,0 +1,10 @@
+# Copyright (c) 2025, Ayush Singh, BeagleBoard.org
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  integration.uart:
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
+    tags: test_framework

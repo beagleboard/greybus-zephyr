@@ -1,0 +1,23 @@
+/*
+ * Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	zephyr,greybus {
+		gbbundle1 {
+			status = "okay";
+			compatible = "zephyr,greybus-bundle-bridged-phy";
+			uart-controllers = <&euart0>;
+		};
+	};
+
+	euart0: uart-emul {
+		compatible = "zephyr,uart-emul";
+		status = "okay";
+		current-speed = <0>;
+		rx-fifo-size = <256>;
+		tx-fifo-size = <256>;
+	};
+};

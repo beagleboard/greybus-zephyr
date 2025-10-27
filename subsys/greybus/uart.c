@@ -181,7 +181,7 @@ static void uart_irq_cb(const struct device *dev, void *user_data)
 		return;
 	}
 
-	req = gb_message_request_alloc(MAX_RX_BUF_SIZE, GB_UART_TYPE_RECEIVE_DATA, false);
+	req = gb_message_request_alloc(MAX_RX_BUF_SIZE, GB_UART_TYPE_RECEIVE_DATA, true);
 	if (!req) {
 		LOG_ERR("Failed to allocate message");
 		return;
@@ -199,7 +199,9 @@ static void uart_irq_cb(const struct device *dev, void *user_data)
 	req->header.size =
 		ret + sizeof(struct gb_message) + sizeof(struct gb_uart_recv_data_request);
 
-	gb_transport_message_send(req, cport);
+	if (ret) {
+		gb_transport_message_send(req, cport);
+	}
 
 free_msg:
 	gb_message_dealloc(req);
@@ -246,6 +248,9 @@ static void gb_uart_handler(const void *priv, struct gb_message *msg, uint16_t c
 		return gb_uart_set_control_line_state(cport, msg, dev);
 	case GB_UART_TYPE_SEND_BREAK:
 		return gb_uart_send_break(cport, msg, dev);
+	case GB_UART_TYPE_FLUSH_FIFOS:
+		/* Since I am not doing any internal buffering, this is not implemented. */
+		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 	default:
 		LOG_ERR("Invalid type");
 		return gb_transport_message_empty_response_send(msg, GB_OP_PROTOCOL_BAD, cport);
