@@ -345,7 +345,7 @@ static void gb_gpio_disconnected(const void *priv)
 	gpio_remove_callback(data->dev, &data->cb);
 }
 
-struct gb_driver gb_gpio_driver = {
+const struct gb_driver gb_gpio_driver = {
 	.connected = gb_gpio_connected,
 	.disconnected = gb_gpio_disconnected,
 	.op_handler = gb_gpio_handler,

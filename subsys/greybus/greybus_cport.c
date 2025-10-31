@@ -20,10 +20,10 @@
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
-extern struct gb_driver gb_control_driver;
-extern struct gb_driver gb_i2c_driver;
-extern struct gb_driver gb_loopback_driver;
-extern struct gb_driver gb_log_driver;
+extern const struct gb_driver gb_control_driver;
+extern const struct gb_driver gb_i2c_driver;
+extern const struct gb_driver gb_loopback_driver;
+extern const struct gb_driver gb_log_driver;
 
 /* Reset the counter to 0 */
 enum {
@@ -181,7 +181,7 @@ static struct gb_cport cports[] = {
 
 BUILD_ASSERT(GREYBUS_CPORT_COUNT == ARRAY_SIZE(cports));
 
-struct gb_cport *gb_cport_get(uint16_t cport)
+const struct gb_cport *gb_cport_get(uint16_t cport)
 {
 	return (cport >= GREYBUS_CPORT_COUNT) ? NULL : &cports[cport];
 }

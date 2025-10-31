@@ -62,6 +62,6 @@ static void gb_loopback_handler(const void *priv, struct gb_message *msg, uint16
 	}
 }
 
-struct gb_driver gb_loopback_driver = {
+const struct gb_driver gb_loopback_driver = {
 	.op_handler = gb_loopback_handler,
 };

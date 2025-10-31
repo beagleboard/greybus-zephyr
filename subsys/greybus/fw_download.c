@@ -171,7 +171,7 @@ static void op_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 	}
 }
 
-struct gb_driver gb_fw_download_driver = {
+const struct gb_driver gb_fw_download_driver = {
 	.op_handler = op_handler,
 };
 

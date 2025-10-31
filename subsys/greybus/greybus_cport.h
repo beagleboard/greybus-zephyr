@@ -10,13 +10,13 @@
 #include <greybus/greybus.h>
 
 struct gb_cport {
-	struct gb_driver *driver;
+	const struct gb_driver *driver;
 	const void *priv;
 	uint8_t bundle;
 	uint8_t protocol;
 };
 
-struct gb_cport *gb_cport_get(uint16_t cport);
+const struct gb_cport *gb_cport_get(uint16_t cport);
 
 /**
  * Initialize all cports.

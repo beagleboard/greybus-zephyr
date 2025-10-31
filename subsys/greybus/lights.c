@@ -170,6 +170,6 @@ static void gb_lights_handler(const void *priv, struct gb_message *msg, uint16_t
 	}
 }
 
-struct gb_driver gb_lights_driver = {
+const struct gb_driver gb_lights_driver = {
 	.op_handler = gb_lights_handler,
 };

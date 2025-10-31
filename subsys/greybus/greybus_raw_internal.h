@@ -9,7 +9,7 @@
 
 #include <greybus/greybus_raw.h>
 
-extern struct gb_driver gb_raw_driver;
+extern const struct gb_driver gb_raw_driver;
 
 struct gb_raw_driver_data {
 	greybus_raw_cb_t cb;

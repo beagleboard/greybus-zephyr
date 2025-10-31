@@ -184,6 +184,6 @@ static void gb_control_handler(const void *priv, struct gb_message *msg, uint16_
 	}
 }
 
-struct gb_driver gb_control_driver = {
+const struct gb_driver gb_control_driver = {
 	.op_handler = gb_control_handler,
 };

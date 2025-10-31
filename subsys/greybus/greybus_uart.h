@@ -9,6 +9,6 @@
 
 #include <zephyr/drivers/uart.h>
 
-extern struct gb_driver gb_uart_driver;
+extern const struct gb_driver gb_uart_driver;
 
 #endif // _GREYBUS_UART_H_

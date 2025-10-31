@@ -99,7 +99,7 @@ uint8_t gb_errno_to_op_result(int err)
 
 static void gb_process_msg(struct gb_message *msg, uint16_t cport)
 {
-	struct gb_cport *cport_ptr = gb_cport_get(cport);
+	const struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (gb_message_type(msg) == GB_PING_TYPE) {
 		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
@@ -133,7 +133,7 @@ static void gb_pending_message_worker(void *p1, void *p2, void *p3)
 
 int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 {
-	struct gb_driver *drv;
+	const struct gb_driver *drv;
 	const struct gb_msg_with_cport item = {
 		.cport = cport,
 		.msg = msg,
@@ -155,7 +155,7 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 int gb_listen(uint16_t cport)
 {
 	const struct gb_transport_backend *transport = gb_transport_get_backend();
-	struct gb_cport *cport_ptr = gb_cport_get(cport);
+	const struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
@@ -173,7 +173,7 @@ int gb_listen(uint16_t cport)
 int gb_stop_listening(uint16_t cport)
 {
 	const struct gb_transport_backend *transport = gb_transport_get_backend();
-	struct gb_cport *cport_ptr = gb_cport_get(cport);
+	const struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
@@ -229,7 +229,7 @@ void gb_deinit(void)
 
 int gb_notify(uint16_t cport, enum gb_event event)
 {
-	struct gb_cport *cport_ptr = gb_cport_get(cport);
+	const struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (!cport_ptr) {
 		return -EINVAL;

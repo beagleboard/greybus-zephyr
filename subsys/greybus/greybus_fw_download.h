@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-extern struct gb_driver gb_fw_download_driver;
+extern const struct gb_driver gb_fw_download_driver;
 
 void gb_fw_download_find_firmware(uint8_t req_id, const char *firmware_tag);
 

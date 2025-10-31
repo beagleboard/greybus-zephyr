@@ -264,7 +264,7 @@ static void gb_uart_disconnected(const void *priv)
 	uart_irq_rx_disable(dev);
 }
 
-struct gb_driver gb_uart_driver = {
+const struct gb_driver gb_uart_driver = {
 	.op_handler = gb_uart_handler,
 	.connected = gb_uart_connected,
 	.disconnected = gb_uart_disconnected,

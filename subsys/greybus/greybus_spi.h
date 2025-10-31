@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <greybus/greybus_protocols.h>
 
-extern struct gb_driver gb_spi_driver;
+extern const struct gb_driver gb_spi_driver;
 
 struct gb_spi_device_data {
 	struct gb_spi_device_config_response data;

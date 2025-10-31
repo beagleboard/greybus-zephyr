@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-extern struct gb_driver gb_fw_mgmt_driver;
+extern const struct gb_driver gb_fw_mgmt_driver;
 
 void gb_fw_mgmt_interface_fw_loaded(uint8_t id, uint8_t status, uint16_t major, uint16_t minor);
 

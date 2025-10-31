@@ -150,7 +150,7 @@ int manifest_create(uint8_t buf[], size_t len)
 	int ret, i;
 	struct greybus_manifest *mnfb;
 	struct greybus_descriptor *desc;
-	struct gb_cport *cport;
+	const struct gb_cport *cport;
 
 	if (len < manifest_size()) {
 		return -E2BIG;

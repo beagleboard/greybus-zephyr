@@ -42,6 +42,6 @@ void gb_log_send_log(uint16_t len, const char *log)
 	gb_message_dealloc(msg);
 }
 
-struct gb_driver gb_log_driver = {
+const struct gb_driver gb_log_driver = {
 	.op_handler = op_handler,
 };

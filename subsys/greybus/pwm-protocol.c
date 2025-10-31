@@ -156,6 +156,6 @@ static void gb_pwm_handler(const void *priv, struct gb_message *msg, uint16_t cp
 	}
 }
 
-struct gb_driver gb_pwm_driver = {
+const struct gb_driver gb_pwm_driver = {
 	.op_handler = gb_pwm_handler,
 };

@@ -44,14 +44,14 @@ static void op_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 	}
 }
 
-struct gb_driver gb_raw_driver = {
+const struct gb_driver gb_raw_driver = {
 	.op_handler = op_handler,
 };
 
 int greybus_raw_register(greybus_raw_cb_t cb, void *priv)
 {
 	int i;
-	struct gb_cport *cport;
+	const struct gb_cport *cport;
 	struct gb_raw_driver_data *data;
 
 	for (i = 0; i < GREYBUS_RAW_CPORT_COUNT; ++i) {

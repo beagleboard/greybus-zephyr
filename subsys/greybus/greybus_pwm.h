@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-extern struct gb_driver gb_pwm_driver;
+extern const struct gb_driver gb_pwm_driver;
 
 struct gb_pwm_channel_data {
 	uint32_t duty;

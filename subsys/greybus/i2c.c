@@ -130,6 +130,6 @@ static void gb_i2c_handler(const void *priv, struct gb_message *msg, uint16_t cp
 	}
 }
 
-struct gb_driver gb_i2c_driver = {
+const struct gb_driver gb_i2c_driver = {
 	.op_handler = gb_i2c_handler,
 };
