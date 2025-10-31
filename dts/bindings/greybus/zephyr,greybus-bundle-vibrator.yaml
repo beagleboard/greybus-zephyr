@@ -1,0 +1,13 @@
+# Copyright (c) 2025, Ayush Singh BeagleBoard.org
+# SPDX-License-Identifier: Apache-2.0
+
+description: Greybus Bundle for class Vibrator
+
+compatible: "zephyr,greybus-bundle-vibrator"
+
+include: [base.yaml]
+
+properties:
+  vibrators:
+    type: phandles
+    description: Vibrators in the bundle

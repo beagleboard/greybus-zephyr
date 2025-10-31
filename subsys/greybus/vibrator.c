@@ -27,87 +27,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <greybus/greybus.h>
-#include <gpio.h>
-#include <sys/byteorder.h>
+#include <zephyr/drivers/haptics.h>
+#include <greybus/greybus_protocols.h>
+#include <greybus/greybus_messages.h>
+#include "greybus_transport.h"
+#include "greybus_internal.h"
 
-#include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(greybus_vibrator, CONFIG_GREYBUS_LOG_LEVEL);
-
-#include "vibrator-gb.h"
-
-/* Version of the Greybus vibrator protocol we support */
-#define GB_VIBRATOR_VERSION_MAJOR 0x00
-#define GB_VIBRATOR_VERSION_MINOR 0x01
-
-/* Pick a GPIO line exposed on APBridge2 via the schematics */
-#define GB_VIBRATOR_DUMMY_GPIO 0x00
-
-static uint8_t gb_vibrator_protocol_version(struct gb_operation *operation)
+static void gb_vibrator_vibrator_on(uint16_t cport, struct gb_message *req,
+				    const struct device *dev)
 {
-	struct gb_vibrator_proto_version_response *response;
+	int ret = haptics_start_output(dev);
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->major = GB_VIBRATOR_VERSION_MAJOR;
-	response->minor = GB_VIBRATOR_VERSION_MINOR;
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret), cport);
 }
 
-static uint8_t gb_vibrator_vibrator_on(struct gb_operation *operation)
+static void gb_vibrator_vibrator_off(uint16_t cport, struct gb_message *req,
+				     const struct device *dev)
 {
-	struct gb_vibrator_on_request *request = gb_operation_get_request_payload(operation);
+	int ret = haptics_stop_output(dev);
 
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	gpio_activate(GB_VIBRATOR_DUMMY_GPIO);
-	gpio_set_value(GB_VIBRATOR_DUMMY_GPIO, 1);
-
-	usleep(sys_le16_to_cpu(request->timeout_ms));
-
-	gpio_deactivate(GB_VIBRATOR_DUMMY_GPIO);
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret), cport);
 }
 
-static uint8_t gb_vibrator_vibrator_off(struct gb_operation *operation)
+static void gb_vibrator_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	// Deactivate the GPIO line, somehow.
+	const struct device *dev = priv;
 
-	gpio_activate(GB_VIBRATOR_DUMMY_GPIO);
-	gpio_set_value(GB_VIBRATOR_DUMMY_GPIO, 0);
-	gpio_deactivate(GB_VIBRATOR_DUMMY_GPIO);
-
-	return GB_OP_SUCCESS;
-}
-
-static uint8_t gb_vibrator_handler(uint8_t type, struct gb_operation *opr)
-{
-	switch (type) {
-	case GB_VIBRATOR_TYPE_PROTOCOL_VERSION:
-		return gb_vibrator_protocol_version(opr);
-	case GB_VIBRATOR_TYPE_VIBRATOR_ON:
-		return gb_vibrator_vibrator_on(opr);
-	case GB_VIBRATOR_TYPE_VIBRATOR_OFF:
-		return gb_vibrator_vibrator_off(opr);
+	switch (gb_message_type(msg)) {
+	case GB_VIBRATOR_TYPE_ON:
+		return gb_vibrator_vibrator_on(cport, msg, dev);
+	case GB_VIBRATOR_TYPE_OFF:
+		return gb_vibrator_vibrator_off(cport, msg, dev);
 	default:
-		LOG_ERR("Invalid type");
-		return GB_OP_INVALID;
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 	}
 }
 
-static struct gb_driver gb_vibrator_driver = {
+const struct gb_driver gb_vibrator_driver = {
 	.op_handler = gb_vibrator_handler,
 };
-
-void gb_vibrator_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gb_vibrator_driver);
-}

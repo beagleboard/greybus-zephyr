@@ -51,9 +51,15 @@ struct greybus_manifest_cport {
 	UTIL_AND(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights, okay),           \
 		 CONFIG_GREYBUS_LIGHTS)
 
+#define _GB_BUNDLE_VIBRATORS_CHECK(node_id)                                                        \
+	UTIL_AND(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_vibrator, okay),         \
+		 CONFIG_GREYBUS_VIBRATOR)
+
 #define _GB_BUNDLE_CB(node_id)                                                                     \
 	COND_CODE_1(_GB_BUNDLE_BRIDGED_PHY_CHECK(node_id), (GREYBUS_CLASS_BRIDGED_PHY),            \
-		    (IF_ENABLED(_GB_BUNDLE_LIGHTS_CHECK(node_id), (GREYBUS_CLASS_LIGHTS))))
+		    (COND_CODE_1(_GB_BUNDLE_LIGHTS_CHECK(node_id), (GREYBUS_CLASS_LIGHTS),         \
+				 (IF_ENABLED(_GB_BUNDLE_VIBRATORS_CHECK(node_id),                  \
+					     (GREYBUS_CLASS_VIBRATOR))))))
 
 /* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {

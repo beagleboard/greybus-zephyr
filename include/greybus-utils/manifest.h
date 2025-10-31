@@ -45,14 +45,22 @@
 	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_UART, uart_controllers) +                        \
 	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_PWM, pwm_controllers))
 
+#define _GREYBUS_CPORTS_IN_VIBRATOR_BUNDLE(_node_id)                                               \
+	_BUNDLE_PROP_LEN(_node_id, CONFIG_GREYBUS_VIBRATOR, vibrators)
+
 #define _GREYBUS_CPORT_COUNTER(_node_id)                                                           \
 	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_bridged_phy, okay),  \
-		    (_GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id)), (1))
+		    (_GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id)),                             \
+		    (COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id,                               \
+							   zephyr_greybus_bundle_vibrator, okay),  \
+				 (_GREYBUS_CPORTS_IN_VIBRATOR_BUNDLE(_node_id)), (1))))
 
 /*
  * Handler for cports and bundles that do not exist in DT.
  * - Control
  * - Loopback
+ * - Log
+ * - Raw
  */
 #define _GREYBUS_SPECIAL_CPORTS                                                                    \
 	(1 + COND_CODE_1(CONFIG_GREYBUS_LOOPBACK, (1), (0)) +                                      \

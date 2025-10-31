@@ -24,6 +24,7 @@ extern const struct gb_driver gb_control_driver;
 extern const struct gb_driver gb_i2c_driver;
 extern const struct gb_driver gb_loopback_driver;
 extern const struct gb_driver gb_log_driver;
+extern const struct gb_driver gb_vibrator_driver;
 
 /* Reset the counter to 0 */
 enum {
@@ -138,12 +139,22 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 	IF_ENABLED(CONFIG_GREYBUS_LIGHTS, (GB_CPORT(&gb_lights_priv_data, _bundle,                 \
 						    GREYBUS_PROTOCOL_LIGHTS, &gb_lights_driver)))
 
+#define GREYBUS_CPORT_IN_VIBRATORS(_node_id, _bundle)                                              \
+	IF_ENABLED(CONFIG_GREYBUS_VIBRATOR,                                                        \
+		   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, vibrators, _GB_CPORT, (, ), _bundle,  \
+						   GREYBUS_PROTOCOL_VIBRATOR, &gb_vibrator_driver, \
+						   GB_CPORT_DEV_PRIV_DATA)))
+
 #define GB_CPORTS_IN_BUNDLE(node_id, bundle)                                                       \
-	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_bridged_phy, okay),   \
-		    (GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id, bundle)),                       \
-		    (IF_ENABLED(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights,   \
-							  okay),                                   \
-				(GREYBUS_CPORT_IN_LIGHTS(node_id, bundle)))))
+	COND_CODE_1(                                                                               \
+		DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_bridged_phy, okay),       \
+		(GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id, bundle)),                           \
+		(COND_CODE_1(                                                                      \
+			DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights, okay),    \
+			(GREYBUS_CPORT_IN_LIGHTS(node_id, bundle)),                                \
+			(IF_ENABLED(DT_NODE_HAS_COMPAT_STATUS(                                     \
+					    node_id, zephyr_greybus_bundle_vibrator, okay),        \
+				    (GREYBUS_CPORT_IN_VIBRATORS(node_id, bundle)))))))
 
 /* Requred for counter based naming to work */
 #define GB_CPORTS_BUNDLE_WRAPPER(node_id) GB_CPORTS_IN_BUNDLE(node_id, LOCAL_COUNTER)

@@ -2176,4 +2176,9 @@ struct gb_log_send_log_request {
 	__u8 msg[];
 } __packed;
 
+/* Vibrator */
+
+#define GB_VIBRATOR_TYPE_ON  0x02
+#define GB_VIBRATOR_TYPE_OFF 0x03
+
 #endif /* __GREYBUS_PROTOCOLS_H */

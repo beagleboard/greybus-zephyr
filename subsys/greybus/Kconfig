@@ -223,6 +223,7 @@ config GREYBUS_USB
 
 config GREYBUS_VIBRATOR
 	bool "Greybus Vibrator"
+	depends on HAPTICS
 	help
 	  Select this for Greybus Vibrator support.
 
