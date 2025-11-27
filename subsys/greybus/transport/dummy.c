@@ -10,7 +10,7 @@
 #include <greybus-utils/manifest.h>
 #include "../greybus_internal.h"
 
-K_MSGQ_DEFINE(rx_msgq, sizeof(struct gb_msg_with_cport), GREYBUS_CPORT_COUNT * 2, 1);
+K_MSGQ_DEFINE(rx_msgq, sizeof(struct gb_msg_with_cport), 2, 1);
 
 static int init()
 {

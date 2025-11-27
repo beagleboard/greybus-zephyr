@@ -11,6 +11,39 @@ menuconfig GREYBUS
 
 if GREYBUS
 
+config GREYBUS_NODE
+	bool "Enable greybus node support"
+	default y
+	help
+	  This option enables functionality to act as Greybus node.
+
+config GREYBUS_HEAP_MEM_POOL_SIZE
+	int "Heap for Greybus subsystem"
+	default 2048
+	help
+	  Heap memory pre-allocated for greybus subsystem
+
+choice
+	prompt "Which transport shall be used for Greybus?"
+	default GREYBUS_XPORT_TCPIP
+
+config GREYBUS_XPORT_TCPIP
+	bool "Use the TCP/IP Transport for Greybus"
+	depends on NET_TCP
+	depends on NET_SOCKETS
+	depends on !GREYBUS_ENABLE_TLS || (GREYBUS_ENABLE_TLS && NET_SOCKETS_SOCKOPT_TLS)
+	help
+	  This creates a TCP/IP service for Greybus multiplex over single socket.
+
+config GREYBUS_XPORT_DUMMY
+	bool "Use the dummy Transport for Greybus"
+	help
+	  This is intended for testing and tracking base greybus subsystem size.
+
+endchoice
+
+if GREYBUS_NODE
+
 config GREYBUS_VENDOR_STRING
 	string "Greybus Vendor String"
 	default "Zephyr Project RTOS"
@@ -26,12 +59,6 @@ config GREYBUS_VERSION_MAJOR
 config GREYBUS_VERSION_MINOR
 	int
 	default 1
-
-config GREYBUS_HEAP_MEM_POOL_SIZE
-	int "Heap for Greybus subsystem"
-	default 2048
-	help
-	  Heap memory pre-allocated for greybus subsystem
 
 config GREYBUS_ENABLE_TLS
 	bool "Use Transport Layer Security (TLS)"
@@ -122,25 +149,6 @@ config GREYBUS_TLS_BUILTIN_SERVER_PRIVKEY
 
 endif # GREYBUS_TLS_BUILTIN
 endif # GREYBUS_ENABLE_TLS
-
-choice
-	prompt "Which transport shall be used for Greybus?"
-	default GREYBUS_XPORT_TCPIP
-
-config GREYBUS_XPORT_TCPIP
-	bool "Use the TCP/IP Transport for Greybus"
-	depends on NET_TCP
-	depends on NET_SOCKETS
-	depends on !GREYBUS_ENABLE_TLS || (GREYBUS_ENABLE_TLS && NET_SOCKETS_SOCKOPT_TLS)
-	help
-	  This creates a TCP/IP service for Greybus multiplex over single socket.
-
-config GREYBUS_XPORT_DUMMY
-	bool "Use the dummy Transport for Greybus"
-	help
-	  This is intended for testing and tracking base greybus subsystem size.
-
-endchoice
 
 config GREYBUS_AUDIO
 	bool "Greybus Audio"
@@ -259,6 +267,8 @@ config GREYBUS_SERVICE_INIT_PRIORITY
 	range 0 99
 	help
 	  Greybus service init priority to ensure device initialization order.
+
+endif # GREYBUS_NODE
 
 module = GREYBUS
 module-str = Greybus

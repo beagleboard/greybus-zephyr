@@ -5,15 +5,20 @@ zephyr_include_directories(../../../include)
 zephyr_library()
 
 zephyr_library_sources(
-  greybus-core.c
   greybus_messages.c
   greybus_transport.c
   greybus_heap.c
-  greybus_cport.c
-  platform/manifest.c
-  platform/service.c
   platform/certificate.c
-  control-gpb.c
+)
+
+# Node-specific files
+zephyr_library_sources_ifdef(
+	CONFIG_GREYBUS_NODE
+	greybus-core.c
+	control-gpb.c
+	platform/manifest.c
+	platform/service.c
+	greybus_cport.c
 )
 
 if(CONFIG_GREYBUS_TLS_BUILTIN)
@@ -33,9 +38,11 @@ if(CONFIG_GREYBUS_TLS_BUILTIN)
     ${gen_dir}/greybus_tls_builtin_server_privkey.inc)
 endif()
 
+# Transports
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP transport/tcpip.c)
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART transport/uart.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY transport/dummy.c)
+
+# Protocols
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_CAMERA camera.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_GPIO gpio.c)
