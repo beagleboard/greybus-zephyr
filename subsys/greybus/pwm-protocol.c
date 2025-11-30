@@ -32,10 +32,47 @@
 #include "greybus_pwm.h"
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/errno.h>
 #include <greybus/greybus_protocols.h>
 #include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_pwm, CONFIG_GREYBUS_LOG_LEVEL);
+
+/**
+ * @brief Get the number of channels supported by a PWM controller
+ *
+ * This function attempts to determine the number of channels by probing
+ * the PWM device. It tries channels starting from 0 until it encounters
+ * an error, indicating that channel doesn't exist.
+ *
+ * @param dev PWM device
+ * @return Number of channels supported, or 0 on error
+ */
+uint8_t gb_pwm_get_channel_count(const struct device *dev)
+{
+	uint8_t channel = 0;
+	int ret;
+
+	if (dev == NULL) {
+		return 0;
+	}
+
+	/* Probe channels by trying to get cycles per second for each channel.
+	 * When we get an error, we've reached the maximum channel count.
+	 * Most PWM controllers support at least 4 channels, so we'll probe
+	 * up to a reasonable maximum (e.g., 16 channels).
+	 */
+	for (channel = 0; channel < 16; channel++) {
+		uint32_t cycles_per_sec = 0;
+		ret = pwm_get_cycles_per_sec(dev, channel, &cycles_per_sec);
+		if (ret != 0) {
+			/* This channel doesn't exist, so we've found the count */
+			break;
+		}
+	}
+
+	return channel;
+}
 
 static void gb_pwm_protocol_count(uint16_t cport, struct gb_message *req,
 				  struct gb_pwm_driver_data *data)
@@ -154,6 +191,52 @@ static void gb_pwm_handler(const void *priv, struct gb_message *msg, uint16_t cp
 		LOG_ERR("Invalid type");
 		return gb_transport_message_empty_response_send(msg, GB_OP_PROTOCOL_BAD, cport);
 	}
+}
+
+/**
+ * @brief Initialize PWM driver data with channel count
+ *
+ * This function initializes the channel_num field if it wasn't set from
+ * device tree (i.e., if it's 0). It queries the PWM device to determine
+ * the actual number of channels.
+ *
+ * @param data PWM driver data to initialize
+ * @return 0 on success, negative error code on failure
+ */
+int gb_pwm_init(struct gb_pwm_driver_data *data)
+{
+	uint8_t detected_channels;
+	uint8_t max_channels = 16; /* Default allocation when channels not in DT */
+
+	if (data == NULL || data->dev == NULL) {
+		return -EINVAL;
+	}
+
+	/* If channel_num is 0, it means it wasn't set from device tree,
+	 * so we need to query it at runtime.
+	 */
+	if (data->channel_num == 0) {
+		detected_channels = gb_pwm_get_channel_count(data->dev);
+		if (detected_channels == 0) {
+			LOG_ERR("Failed to determine PWM channel count for device %s",
+				data->dev->name);
+			return -EINVAL;
+		}
+
+		/* Clamp to maximum allocated size (16 when channels not in DT) */
+		if (detected_channels > max_channels) {
+			LOG_WRN("PWM device %s has %u channels, but only %u allocated. "
+				"Consider adding 'channels' property to device tree.",
+				data->dev->name, detected_channels, max_channels);
+			data->channel_num = max_channels;
+		} else {
+			data->channel_num = detected_channels;
+		}
+
+		LOG_DBG("PWM device %s has %u channels", data->dev->name, data->channel_num);
+	}
+
+	return 0;
 }
 
 const struct gb_driver gb_pwm_driver = {

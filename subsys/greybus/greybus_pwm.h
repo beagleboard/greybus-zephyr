@@ -25,4 +25,20 @@ struct gb_pwm_driver_data {
 	uint8_t channel_num;
 };
 
+/**
+ * @brief Get the number of channels supported by a PWM controller
+ *
+ * @param dev PWM device
+ * @return Number of channels supported, or 0 on error
+ */
+uint8_t gb_pwm_get_channel_count(const struct device *dev);
+
+/**
+ * @brief Initialize PWM driver data with channel count
+ *
+ * @param data PWM driver data to initialize
+ * @return 0 on success, negative error code on failure
+ */
+int gb_pwm_init(struct gb_pwm_driver_data *data);
+
 #endif // _GREYBUS_PWM_H_
