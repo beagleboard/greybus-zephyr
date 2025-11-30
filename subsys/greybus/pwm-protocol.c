@@ -59,10 +59,10 @@ uint8_t gb_pwm_get_channel_count(const struct device *dev)
 
 	/* Probe channels by trying to get cycles per second for each channel.
 	 * When we get an error, we've reached the maximum channel count.
-	 * Most PWM controllers support at least 4 channels, so we'll probe
-	 * up to a reasonable maximum (e.g., 16 channels).
+	 * Most PWM controllers support up to 8 channels, so we'll probe
+	 * up to that limit.
 	 */
-	for (channel = 0; channel < 16; channel++) {
+	for (channel = 0; channel < 8; channel++) {
 		uint32_t cycles_per_sec = 0;
 		ret = pwm_get_cycles_per_sec(dev, channel, &cycles_per_sec);
 		if (ret != 0) {
@@ -193,52 +193,37 @@ static void gb_pwm_handler(const void *priv, struct gb_message *msg, uint16_t cp
 	}
 }
 
-/**
- * @brief Initialize PWM driver data with channel count
- *
- * This function initializes the channel_num field if it wasn't set from
- * device tree (i.e., if it's 0). It queries the PWM device to determine
- * the actual number of channels.
- *
- * @param data PWM driver data to initialize
- * @return 0 on success, negative error code on failure
- */
-int gb_pwm_init(struct gb_pwm_driver_data *data)
+static void gb_pwm_connected(const void *priv, uint16_t cport)
 {
+	struct gb_pwm_driver_data *data = (struct gb_pwm_driver_data *)priv;
 	uint8_t detected_channels;
-	uint8_t max_channels = 16; /* Default allocation when channels not in DT */
+	const uint8_t max_channels = 8; /* Maximum allocated array size */
 
 	if (data == NULL || data->dev == NULL) {
-		return -EINVAL;
+		return;
 	}
 
-	/* If channel_num is 0, it means it wasn't set from device tree,
-	 * so we need to query it at runtime.
-	 */
-	if (data->channel_num == 0) {
-		detected_channels = gb_pwm_get_channel_count(data->dev);
-		if (detected_channels == 0) {
-			LOG_ERR("Failed to determine PWM channel count for device %s",
-				data->dev->name);
-			return -EINVAL;
-		}
-
-		/* Clamp to maximum allocated size (16 when channels not in DT) */
-		if (detected_channels > max_channels) {
-			LOG_WRN("PWM device %s has %u channels, but only %u allocated. "
-				"Consider adding 'channels' property to device tree.",
-				data->dev->name, detected_channels, max_channels);
-			data->channel_num = max_channels;
-		} else {
-			data->channel_num = detected_channels;
-		}
-
-		LOG_DBG("PWM device %s has %u channels", data->dev->name, data->channel_num);
+	/* Detect channel count at runtime */
+	detected_channels = gb_pwm_get_channel_count(data->dev);
+	if (detected_channels == 0) {
+		LOG_ERR("Failed to determine PWM channel count for device %s",
+			data->dev->name);
+		return;
 	}
 
-	return 0;
+	/* Clamp to maximum allocated size */
+	if (detected_channels > max_channels) {
+		LOG_WRN("PWM device %s has %u channels, but only %u allocated",
+			data->dev->name, detected_channels, max_channels);
+		data->channel_num = max_channels;
+	} else {
+		data->channel_num = detected_channels;
+	}
+
+	LOG_DBG("PWM device %s has %u channels", data->dev->name, data->channel_num);
 }
 
 const struct gb_driver gb_pwm_driver = {
+	.connected = gb_pwm_connected,
 	.op_handler = gb_pwm_handler,
 };

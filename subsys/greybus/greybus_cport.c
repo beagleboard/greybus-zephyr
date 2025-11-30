@@ -43,17 +43,11 @@ enum {
 	};
 
 #define GB_PWM_PRIV_DATA(_node_id, _prop, _idx)                                                    \
-	static struct gb_pwm_channel_data gb_pwm_channel_data_arr_##_idx[                            \
-		COND_CODE_1(DT_NODE_HAS_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), channels), \
-			    (DT_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), channels)),         \
-			    (16))];                                                                  \
+	static struct gb_pwm_channel_data gb_pwm_channel_data_arr_##_idx[8];                       \
 	static struct gb_pwm_driver_data gb_pwm_priv_data_##_idx = {                               \
 		.channel_data = gb_pwm_channel_data_arr_##_idx,                                    \
 		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
-		.channel_num = COND_CODE_1(                                                         \
-			DT_NODE_HAS_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), channels),      \
-			(DT_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), channels)),              \
-			(0)),                                                                        \
+		.channel_num = 0,                                                                  \
 	};
 
 #define GB_SPI_PRIV_DATA(_node_id, _prop, _idx)                                                    \
@@ -205,25 +199,6 @@ const struct gb_cport *gb_cport_get(uint16_t cport)
 
 int gb_cports_init()
 {
-	int ret;
-	const struct gb_cport *cport;
-
-	/* Initialize PWM drivers - set channel count if not set from device tree */
-	for (uint16_t i = 0; i < GREYBUS_CPORT_COUNT; i++) {
-		cport = gb_cport_get(i);
-		if (cport == NULL) {
-			continue;
-		}
-
-		if (cport->protocol == GREYBUS_PROTOCOL_PWM && cport->priv != NULL) {
-			ret = gb_pwm_init((struct gb_pwm_driver_data *)cport->priv);
-			if (ret < 0) {
-				LOG_ERR("Failed to initialize PWM driver for cport %u: %d", i, ret);
-				/* Continue with other cports even if one fails */
-			}
-		}
-	}
-
 	return 0;
 }
 
