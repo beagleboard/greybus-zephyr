@@ -53,6 +53,9 @@ typedef void (*gb_controller_destroy_connection_t)(const struct gb_interface *, 
  * @param id: Interface ID
  * @param write: a non-blocking write function. The ownership of message is
  * transferred.
+ * @param create_connection: Called when a new connection with a cport is created. Optional.
+ * @param destroy_connection: Called when an existing connection with a cport is destroyed.
+ * Optional.
  * @param ctrl_data: private controller data
  */
 struct gb_interface {
@@ -129,6 +132,8 @@ struct gb_interface *gb_interface_get(uint8_t id);
 /**
  * Allocate greybus interface dynamically.
  *
+ * Also adds interface to cache.
+ *
  * @param write_cb
  * @param create_connection_cb
  * @param destroy_connection_cb
@@ -144,7 +149,7 @@ struct gb_interface *gb_interface_alloc(gb_controller_write_callback_t write_cb,
 /**
  * De-allocate greybus interface
  *
- * Also registers greybus interface.
+ * Also removes greybus interface from cache.
  *
  * @param intf
  */

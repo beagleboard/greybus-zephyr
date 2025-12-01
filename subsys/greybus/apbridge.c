@@ -95,10 +95,13 @@ int gb_apbridge_connection_create(uint8_t intf1_id, uint16_t intf1_cport, uint8_
 		return -EINVAL;
 	}
 
-	ret = intf->create_connection(intf, node_cport);
-	if (ret < 0) {
-		LOG_ERR("Failed to create node connection");
-		return ret;
+	/* create_connection is optional */
+	if (intf->create_connection) {
+		ret = intf->create_connection(intf, node_cport);
+		if (ret < 0) {
+			LOG_ERR("Failed to create node connection");
+			return ret;
+		}
 	}
 
 	ret = node_ap_add(ap_cport, node_cport, intf);
@@ -131,8 +134,8 @@ int gb_apbridge_connection_destroy(uint8_t intf1_id, uint16_t intf1_cport, uint8
 	}
 
 	intf = gb_interface_get(node_id);
-	/* Ignore if intf has already been cleaned up */
-	if (intf) {
+	/* Ignore if intf has already been cleaned up, or if destroy_connection is not defined */
+	if (intf && intf->destroy_connection) {
 		intf->destroy_connection(intf, node_cport);
 	}
 
