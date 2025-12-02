@@ -30,6 +30,12 @@ config GREYBUS_APBRIDGE_CPORTS
 	help
 	  Specify the maximum number of cports supported by the APBridge
 
+# TODO: Add standalone SVC support
+config GREYBUS_SVC
+	bool "Enable greybus SVC implementation"
+	help
+	  This option enables software implementation of Greybus SVC.
+
 endif
 
 config GREYBUS_NODE

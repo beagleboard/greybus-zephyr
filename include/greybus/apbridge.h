@@ -14,6 +14,7 @@
 #include <greybus/greybus_messages.h>
 
 #define AP_MAX_NODES CONFIG_GREYBUS_APBRIDGE_CPORTS
+#define SVC_INF_ID   0
 #define AP_INF_ID    1
 
 struct gb_interface;

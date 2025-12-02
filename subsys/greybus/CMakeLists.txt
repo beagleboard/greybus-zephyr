@@ -28,6 +28,12 @@ zephyr_library_sources_ifdef(
 	interfaces.c
 )
 
+# SVC-specific files
+zephyr_library_sources_ifdef(
+	CONFIG_GREYBUS_SVC
+	svc.c
+)
+
 if(CONFIG_GREYBUS_TLS_BUILTIN)
   set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
 

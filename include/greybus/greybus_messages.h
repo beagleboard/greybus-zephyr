@@ -147,6 +147,30 @@ struct gb_message *gb_message_request_alloc(size_t payload_len, uint8_t request_
 					    bool is_oneshot);
 
 /*
+ * Allocate a greybus request message with payload
+ *
+ * @param payload
+ * @param Payload len
+ * @param Request Type
+ * @param Is one shot
+ *
+ * @return greybus message allocated on heap. Null in case of error
+ */
+static inline struct gb_message *gb_message_request_alloc_with_payload(const void *payload,
+								       size_t payload_len,
+								       uint8_t request_type,
+								       bool is_oneshot)
+{
+	struct gb_message *req = gb_message_request_alloc(payload_len, request_type, is_oneshot);
+
+	if (req) {
+		memcpy(req->payload, payload, payload_len);
+	}
+
+	return req;
+}
+
+/*
  * Allocate a greybus response message
  *
  * @param Payload
