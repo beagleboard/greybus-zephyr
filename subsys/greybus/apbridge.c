@@ -117,8 +117,8 @@ int gb_apbridge_connection_destroy(uint8_t intf1_id, uint16_t intf1_cport, uint8
 				   uint16_t intf2_cport)
 {
 	uint8_t node_id;
+	struct gb_interface *intf;
 	uint16_t ap_cport, node_cport;
-	const struct gb_interface *intf;
 
 	if (intf1_id == AP_INF_ID) {
 		node_id = intf2_id;

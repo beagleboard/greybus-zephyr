@@ -38,7 +38,7 @@ typedef int (*gb_controller_write_callback_t)(struct gb_interface *, struct gb_m
  *
  * @return 0 if successful. Negative in case of error
  */
-typedef int (*gb_controller_create_connection_t)(const struct gb_interface *, uint16_t);
+typedef int (*gb_controller_create_connection_t)(struct gb_interface *, uint16_t);
 
 /**
  * Callback to destroy connection with a Cport in the interface
@@ -46,7 +46,7 @@ typedef int (*gb_controller_create_connection_t)(const struct gb_interface *, ui
  * @param controller
  * @param cport
  */
-typedef void (*gb_controller_destroy_connection_t)(const struct gb_interface *, uint16_t);
+typedef void (*gb_controller_destroy_connection_t)(struct gb_interface *, uint16_t);
 
 /**
  * A greybus interface. Can have multiple Cports
