@@ -23,3 +23,11 @@
 		};
 	};
 };
+
+&light {
+	status = "disabled";
+};
+
+&humidity {
+	status = "disabled";
+};
