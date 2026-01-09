@@ -1,0 +1,7 @@
+* xref:building.adoc[]
+
+* Using Greybus Peripherals
+** xref:gpio.adoc[]
+** xref:i2c.adoc[]
+
+* xref:additional-resources.adoc[]

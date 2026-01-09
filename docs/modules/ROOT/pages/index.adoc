@@ -1,0 +1,49 @@
+= Greybus for Zephyr
+
+== Overview
+
+Greybus is a lightweight, message-based protocol framework that provides a standardized way for hosts to access hardware functions implemented on remote modules. It was originally developed for modular systems and defines a set of well-specified operation protocols for common peripheral classes such as GPIO, I²C, SPI, PWM, and firmware updates.
+
+The Greybus module for Zephyr provides an implementation of the Greybus protocol layers that map Greybus operations to Zephyr subsystems. When enabled, a Zephyr device can expose its hardware capabilities to a host using the Greybus protocols. The host discovers available functionality through Greybus manifest data, then issues class-specific requests that the Zephyr module processes and responds to.
+
+Initially, Greybus was designed for use over https://en.wikipedia.org/wiki/UniPro[Unipro]. However, the protocol itself is mostly independent of underlying transport. Currently, the Greybus module supports TCP socket as transport. However, any transport such as UART, I2C, etc should work fine. See the contents of https://github.com/beagleboard/greybus-zephyr/tree/main/subsys/greybus/transport[this directory] for the current supported transport backends. Feel free to create PRs for new transport backends.
+
+Greybus is licensed under a combination of Apache-2.0 and BSD-3-Clause license.
+
+== Using Greybus for I/O
+
+At this point, the system should be ready to perform I/O on remote devices using
+Greybus. Currently, this module supports the following protocols:
+
+[cols="3,1,1,1", options="header"]
+|===
+| Protocol | Good | Partial | Broken/Missing
+
+| Audio                    |       |       | x
+| Camera                   |       |       | x
+| Component Authentication |       |       | x
+| Firmware Download        |       | x     |
+| Firmware Management      |       | x     |
+| HID                      |       |       | x
+| Lights                   |       | x     |
+| Log                      | x     |       |
+| Loopback                 | x     |       |
+| Power Supply             |       |       | x
+| Raw                      |       | x     |
+| Vibrator                 | x     |       |
+| USB                      |       |       | x
+| xref:gpio.adoc[GPIO]     | x     |       |
+| SPI                      |       | x     |
+| UART                     |       | x     |
+| PWM                      |       | x     |
+| xref:i2c.adoc[I2C]       | x     |       |
+| SDIO                     |       |       | x
+|===
+
+== Reference
+
+* https://github.com/projectara/greybus-spec[Greybus Specification]
+
+* Christopher Friedt, *LPC 2020*
+** Materials: https://linuxplumbersconf.org/event/7/contributions/814/
+** Video: https://youtu.be/n4yiCF2wYeo?t=11683

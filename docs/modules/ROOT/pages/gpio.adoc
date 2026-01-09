@@ -1,0 +1,51 @@
+= GPIO via Greybus
+
+The following setup has been tested on *BeaglePlay* (host) with *BeagleConnect Freedom* (node).
+
+To ensure that you are interacting with the Greybus GPIO device, run the
+following command. Toggling random GPIOs can sometimes have unintended or
+negative consequences, so this verification step is important.
+
+[source,bash]
+----
+gpiodetect | grep greybus_gpio
+gpiochip0 [greybus_gpio] (32 lines)
+----
+
+Most GPIO controllers expose a number of GPIO lines, so it is important to know
+which physical pin number you are toggling and what effect that action will
+have.
+
+You can use the standard `gpiod` command-line tools to interact with the GPIOs.
+
+== Toggling a GPIO
+
+For example, to toggle GPIO 22, you can use the following script:
+
+[source,bash]
+----
+#!/bin/bash
+# GPIO toggle demo for GPIO 22 pin, i.e. MB2 UART1 TX
+
+# /dev/gpiochipN that Greybus created
+CHIP="$(gpiodetect | grep greybus_gpio | head -n 1 | awk '{print $1}')"
+
+gpioset -c $CHIP -t 0 22=0
+sleep 1s
+gpioset -c $CHIP -t 0 22=1
+----
+
+== Reading a GPIO State
+
+You can also read the state of a GPIO pin as follows:
+
+[source,bash]
+----
+#!/bin/bash
+# GPIO read demo for GPIO 22 pin, i.e. MB2 UART1 TX
+
+# /dev/gpiochipN that Greybus created
+CHIP="$(gpiodetect | grep greybus_gpio | head -n 1 | awk '{print $1}')"
+
+gpioget -c $CHIP 22
+----

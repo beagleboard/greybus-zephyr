@@ -1,0 +1,40 @@
+= Building Greybus
+
+== Adding Greybus to Zephyr
+
+To pull Greybus for Zephyr in as a Zephyr module, either add it as a West project
+in `west.yaml` or include it via a submanifest file (for example,
+`zephyr/submanifests/greybus.yaml`) with the following content, then run
+`west update`:
+
+[source,yaml]
+----
+manifest:
+  projects:
+    - name: Greybus-Zephyr
+      path: modules/lib/greybus
+      revision: main
+      url: https://github.com/beagleboard/greybus-zephyr
+----
+
+== Building for BeagleConnect Freedom
+
+Current testing has been performed using a mainline Linux kernel (6.12) on https://www.beagleboard.org/boards/beagleplay[BeaglePlay] with a CC1352P7 running https://github.com/Ayush1325/cc1352-firmware[greybus-host firmware] and https://www.beagleboard.org/boards/beagleconnect-freedom[BeagleConnect Freedom].
+
+[source,bash]
+----
+west build -b beagleconnect_freedom --sysbuild \
+  -p modules/lib/greybus/samples/basic -- \
+  -DEXTRA_CONF_FILE="transport-tcpip.conf;802154-subg.conf"
+----
+
+The sample uses https://docs.mcuboot.com/[MCUboot] to provide OTA support. The following commands can be used to merge MCUboot and application firmware and flash it to BeagleConnect Freedom:
+
+[source,bash]
+----
+cp build/mcuboot/zephyr/zephyr.bin zephyr.bin
+dd conv=notrunc bs=1024 seek=56 \
+   if=build/basic/zephyr/zephyr.signed.bin of=zephyr.bin
+cc1352_flasher --bcf zephyr.bin
+rm zephyr.bin
+----
