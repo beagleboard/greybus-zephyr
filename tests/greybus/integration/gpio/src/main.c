@@ -181,3 +181,20 @@ ZTEST(greybus_gpio_tests, test_set_value)
 
 	zassert_equal(gpio_emul_output_get(dev, 0), 0, "Pin was not configured as output");
 }
+
+ZTEST(greybus_gpio_tests, test_invalid_pin_index)
+{
+	struct gb_msg_with_cport resp;
+	struct gb_gpio_get_direction_request *req_data;
+	struct gb_message *msg =
+		gb_message_request_alloc(sizeof(*req_data), GB_GPIO_TYPE_GET_DIRECTION, false);
+
+	req_data = (struct gb_gpio_get_direction_request *)msg->payload;
+	req_data->which = 255;
+
+	greybus_rx_handler(1, gb_message_copy(msg));
+	resp = gb_transport_get_message();
+	zassert_false(gb_message_is_success(resp.msg),
+		      "Driver should have rejected invalid pin index 255");
+	gb_message_dealloc(msg);
+}

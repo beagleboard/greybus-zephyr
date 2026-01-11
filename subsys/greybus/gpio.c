@@ -51,7 +51,8 @@ static void gb_gpio_line_count(uint16_t cport, struct gb_message *req,
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static void gb_gpio_activate(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_activate(uint16_t cport, struct gb_message *req,
+			     const struct gb_gpio_driver_data *data)
 {
 	const struct gb_gpio_activate_request *request =
 		(const struct gb_gpio_activate_request *)req->payload;
@@ -60,12 +61,16 @@ static void gb_gpio_activate(uint16_t cport, struct gb_message *req, const struc
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	/* No "activation" in Zephyr. Maybe power mgmt in the future */
 	gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
 }
 
-static void gb_gpio_deactivate(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_deactivate(uint16_t cport, struct gb_message *req,
+			       const struct gb_gpio_driver_data *data)
 {
 	const struct gb_gpio_deactivate_request *request =
 		(const struct gb_gpio_deactivate_request *)req->payload;
@@ -74,13 +79,17 @@ static void gb_gpio_deactivate(uint16_t cport, struct gb_message *req, const str
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	/* No "deactivation" in Zephyr. Maybe power mgmt in the future */
 
 	gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
 }
 
-static void gb_gpio_get_direction(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_get_direction(uint16_t cport, struct gb_message *req,
+				  const struct gb_gpio_driver_data *data)
 {
 	struct gb_gpio_get_direction_response resp_data;
 	const struct gb_gpio_get_direction_request *request =
@@ -90,13 +99,17 @@ static void gb_gpio_get_direction(uint16_t cport, struct gb_message *req, const 
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	/* In Greybus 0 := output, 1 := input. */
-	resp_data.direction = gpio_pin_is_input(dev, request->which);
+	resp_data.direction = gpio_pin_is_input(data->dev, request->which);
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static void gb_gpio_direction_in(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_direction_in(uint16_t cport, struct gb_message *req,
+				 const struct gb_gpio_driver_data *data)
 {
 	uint8_t ret;
 	const struct gb_gpio_direction_in_request *request =
@@ -106,13 +119,17 @@ static void gb_gpio_direction_in(uint16_t cport, struct gb_message *req, const s
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	ret = gb_errno_to_op_result(
-		gpio_pin_configure(dev, (gpio_pin_t)request->which, GPIO_INPUT));
+		gpio_pin_configure(data->dev, (gpio_pin_t)request->which, GPIO_INPUT));
 	return gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_direction_out(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_direction_out(uint16_t cport, struct gb_message *req,
+				  const struct gb_gpio_driver_data *data)
 {
 	int ret;
 	const struct gb_gpio_direction_out_request *request =
@@ -122,18 +139,22 @@ static void gb_gpio_direction_out(uint16_t cport, struct gb_message *req, const 
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
-	ret = gpio_pin_configure(dev, request->which, GPIO_OUTPUT);
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
+	ret = gpio_pin_configure(data->dev, request->which, GPIO_OUTPUT);
 	if (ret != 0) {
 		return gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret),
 								cport);
 	}
 
-	ret = gb_errno_to_op_result(gpio_pin_set(dev, request->which, request->value));
+	ret = gb_errno_to_op_result(gpio_pin_set(data->dev, request->which, request->value));
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_get_value(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_get_value(uint16_t cport, struct gb_message *req,
+			      const struct gb_gpio_driver_data *data)
 {
 	struct gb_gpio_get_value_response resp_data;
 	const struct gb_gpio_get_value_request *request =
@@ -143,12 +164,16 @@ static void gb_gpio_get_value(uint16_t cport, struct gb_message *req, const stru
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
-	resp_data.value = gpio_pin_get(dev, (gpio_pin_t)request->which);
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
+	resp_data.value = gpio_pin_get(data->dev, (gpio_pin_t)request->which);
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static void gb_gpio_set_value(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_set_value(uint16_t cport, struct gb_message *req,
+			      const struct gb_gpio_driver_data *data)
 {
 	uint8_t ret;
 	const struct gb_gpio_set_value_request *request =
@@ -158,12 +183,16 @@ static void gb_gpio_set_value(uint16_t cport, struct gb_message *req, const stru
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
-	ret = gb_errno_to_op_result(gpio_pin_set(dev, request->which, request->value));
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
+	ret = gb_errno_to_op_result(gpio_pin_set(data->dev, request->which, request->value));
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_set_debounce(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_set_debounce(uint16_t cport, struct gb_message *req,
+				 const struct gb_gpio_driver_data *data)
 {
 	uint8_t ret = GB_OP_SUCCESS;
 	gpio_flags_t flags = 0;
@@ -178,16 +207,20 @@ static void gb_gpio_set_debounce(uint16_t cport, struct gb_message *req, const s
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	if (sys_le16_to_cpu(request->usec) > 0) {
 		ret = gb_errno_to_op_result(
-			gpio_pin_configure(dev, (gpio_pin_t)request->which, flags));
+			gpio_pin_configure(data->dev, (gpio_pin_t)request->which, flags));
 	}
 
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_irq_mask(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_irq_mask(uint16_t cport, struct gb_message *req,
+			     const struct gb_gpio_driver_data *data)
 {
 	uint8_t ret;
 	const struct gb_gpio_irq_mask_request *request =
@@ -197,13 +230,17 @@ static void gb_gpio_irq_mask(uint16_t cport, struct gb_message *req, const struc
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	ret = gb_errno_to_op_result(
-		gpio_pin_interrupt_configure(dev, request->which, GPIO_INT_DISABLE));
+		gpio_pin_interrupt_configure(data->dev, request->which, GPIO_INT_DISABLE));
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req,
+			       const struct gb_gpio_driver_data *data)
 {
 	uint8_t ret;
 	const struct gb_gpio_irq_unmask_request *request =
@@ -213,13 +250,17 @@ static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req, const str
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	ret = gb_errno_to_op_result(gpio_pin_interrupt_configure(
-		dev, request->which, GPIO_INT_ENABLE | GPIO_INT_EDGE_RISING));
+		data->dev, request->which, GPIO_INT_ENABLE | GPIO_INT_EDGE_RISING));
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req,
+			     const struct gb_gpio_driver_data *data)
 {
 	uint8_t ret;
 	gpio_flags_t flags;
@@ -230,7 +271,10 @@ static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struc
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
-
+	if (request->which >= data->ngpios) {
+		LOG_ERR("Invalid GPIO pin index: %u", request->which);
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	}
 	switch (request->type) {
 	case GB_GPIO_IRQ_TYPE_NONE:
 		flags = GPIO_INT_DISABLE;
@@ -254,7 +298,7 @@ static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struc
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	ret = gb_errno_to_op_result(gpio_pin_interrupt_configure(dev, request->which, flags));
+	ret = gb_errno_to_op_result(gpio_pin_interrupt_configure(data->dev, request->which, flags));
 
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
@@ -267,27 +311,27 @@ static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t c
 	case GB_GPIO_TYPE_LINE_COUNT:
 		return gb_gpio_line_count(cport, msg, data);
 	case GB_GPIO_TYPE_ACTIVATE:
-		return gb_gpio_activate(cport, msg, data->dev);
+		return gb_gpio_activate(cport, msg, data);
 	case GB_GPIO_TYPE_DEACTIVATE:
-		return gb_gpio_deactivate(cport, msg, data->dev);
+		return gb_gpio_deactivate(cport, msg, data);
 	case GB_GPIO_TYPE_GET_DIRECTION:
-		return gb_gpio_get_direction(cport, msg, data->dev);
+		return gb_gpio_get_direction(cport, msg, data);
 	case GB_GPIO_TYPE_DIRECTION_IN:
-		return gb_gpio_direction_in(cport, msg, data->dev);
+		return gb_gpio_direction_in(cport, msg, data);
 	case GB_GPIO_TYPE_DIRECTION_OUT:
-		return gb_gpio_direction_out(cport, msg, data->dev);
+		return gb_gpio_direction_out(cport, msg, data);
 	case GB_GPIO_TYPE_GET_VALUE:
-		return gb_gpio_get_value(cport, msg, data->dev);
+		return gb_gpio_get_value(cport, msg, data);
 	case GB_GPIO_TYPE_SET_VALUE:
-		return gb_gpio_set_value(cport, msg, data->dev);
+		return gb_gpio_set_value(cport, msg, data);
 	case GB_GPIO_TYPE_SET_DEBOUNCE:
-		return gb_gpio_set_debounce(cport, msg, data->dev);
+		return gb_gpio_set_debounce(cport, msg, data);
 	case GB_GPIO_TYPE_IRQ_TYPE:
-		return gb_gpio_irq_type(cport, msg, data->dev);
+		return gb_gpio_irq_type(cport, msg, data);
 	case GB_GPIO_TYPE_IRQ_MASK:
-		return gb_gpio_irq_mask(cport, msg, data->dev);
+		return gb_gpio_irq_mask(cport, msg, data);
 	case GB_GPIO_TYPE_IRQ_UNMASK:
-		return gb_gpio_irq_unmask(cport, msg, data->dev);
+		return gb_gpio_irq_unmask(cport, msg, data);
 	default:
 		LOG_ERR("Invalid type");
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
