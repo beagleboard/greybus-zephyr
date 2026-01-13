@@ -177,6 +177,7 @@ const struct gb_driver gb_fw_download_driver = {
 
 void gb_fw_download_find_firmware(uint8_t req_id, const char *firmware_tag)
 {
+	const char format[] = "bin";
 	struct gb_message *req =
 		gb_message_request_alloc(sizeof(struct gb_fw_download_find_firmware_request),
 					 GB_FW_DOWNLOAD_TYPE_FIND_FIRMWARE, false);
@@ -185,6 +186,7 @@ void gb_fw_download_find_firmware(uint8_t req_id, const char *firmware_tag)
 
 	priv_data.req_id = req_id;
 	strncpy(req_data->firmware_tag, firmware_tag, sizeof(req_data->firmware_tag));
+	strncpy(req_data->format, format, sizeof(req_data->format));
 
 	gb_transport_message_send(req, GREYBUS_FW_DOWNLOAD_CPORT);
 	gb_message_dealloc(req);
