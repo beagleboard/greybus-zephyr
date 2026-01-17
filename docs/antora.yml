@@ -3,3 +3,10 @@ version: true
 title: Greybus for Zephyr
 nav:
 - modules/ROOT/nav.adoc
+
+asciidoc:
+  attributes:
+    description: >
+      Provides a Zephyr-based implementation of the Greybus protocol, enabling 
+      devices to expose hardware functions such as GPIO, I²C, SPI, PWM, and 
+      firmware updates to a host through standardized, message-based interfaces.
