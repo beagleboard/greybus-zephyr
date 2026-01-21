@@ -58,22 +58,7 @@ struct gb_transport_backend {
 };
 
 /**
- * Initialize greybus.
- *
- * @param transport: greybus transport backend pointer.
- *
- * @return 0 in case of success.
- * @return < 0 in case of error.
- */
-int gb_init(const struct gb_transport_backend *transport);
-
-/**
- * De-initialize greybus.
- */
-void gb_deinit(void);
-
-/**
- * Submit greybus message for processing.
+ * Submit greybus message to node for processing.
  */
 int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
 

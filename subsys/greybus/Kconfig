@@ -63,6 +63,12 @@ config GREYBUS_XPORT_DUMMY
 	help
 	  This is intended for testing and tracking base greybus subsystem size.
 
+config GREYBUS_XPORT_APBRIDGE
+	bool "Send message to local apbridge"
+	depends on GREYBUS_APBRIDGE
+	help
+	  This is intended for use in combined SVC + APBridge setups.
+
 endchoice
 
 config GREYBUS_VENDOR_STRING
@@ -282,12 +288,22 @@ config GREYBUS_RAW_CPORTS
 
 endif # GREYBUS_RAW
 
+config GREYBUS_SERVICE
+	bool "Enable auto start of greybus subsystem"
+	default y
+	help
+	  Enable this option to have greybus startup automatically
+
+if GREYBUS_SERVICE
+
 config GREYBUS_SERVICE_INIT_PRIORITY
 	int "default Greybus Service Init Priority"
 	default 85
 	range 0 99
 	help
 	  Greybus service init priority to ensure device initialization order.
+
+endif # GREYBUS_SERVICE
 
 endif # GREYBUS_NODE
 

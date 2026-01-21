@@ -54,6 +54,7 @@ endif()
 # Transports
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP transport/tcpip.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY transport/dummy.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_APBRIDGE transport/apbridge.c)
 
 # Protocols
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)

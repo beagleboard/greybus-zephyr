@@ -4,12 +4,6 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/mutex.h>
 
-/*
- * Reserve interface 0 for SVC
- * Reserve interface 1 for AP
- */
-#define INTF_START 2
-
 static struct gb_interface *intfs[AP_MAX_NODES];
 K_MUTEX_DEFINE(intfs_mutex);
 
@@ -24,7 +18,7 @@ static int new_interface_id(void)
 
 	ret = -EOVERFLOW;
 
-	for (i = INTF_START; i < ARRAY_SIZE(intfs); i++) {
+	for (i = INTF_START_ID; i < ARRAY_SIZE(intfs); i++) {
 		if (!intfs[i]) {
 			ret = i;
 			goto unlock;

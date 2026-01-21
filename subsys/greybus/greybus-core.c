@@ -198,6 +198,7 @@ int gb_init(const struct gb_transport_backend *transport)
 
 	ret = gb_cports_init();
 	if (ret < 0) {
+		LOG_ERR("Failed to init cports");
 		return ret;
 	}
 
@@ -205,9 +206,7 @@ int gb_init(const struct gb_transport_backend *transport)
 			K_THREAD_STACK_SIZEOF(gb_rx_thread_stack), gb_pending_message_worker, NULL,
 			NULL, NULL, 5, 0, K_NO_WAIT);
 
-	transport->init();
-
-	return 0;
+	return transport->init();
 }
 
 void gb_deinit(void)

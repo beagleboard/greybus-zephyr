@@ -11,6 +11,10 @@ LOG_MODULE_REGISTER(greybus_svc, CONFIG_GREYBUS_LOG_LEVEL);
 #define GB_SVC_VERSION_MAJOR 0x00
 #define GB_SVC_VERSION_MINOR 0x01
 
+#define SVC_INIT_TIMEOUT K_SECONDS(5)
+
+K_SEM_DEFINE(svc_init, 0, 1);
+
 /* TODO: Add support for standalone SVC support */
 static int gb_svc_msg_send(struct gb_message *msg)
 {
@@ -249,6 +253,7 @@ static void gb_handle_msg(struct gb_message *msg)
 		svc_version_response_handler(msg);
 		break;
 	case GB_RESPONSE(GB_SVC_TYPE_SVC_HELLO):
+		k_sem_give(&svc_init);
 		break;
 	case GB_RESPONSE(GB_SVC_TYPE_MODULE_INSERTED):
 		svc_module_inserted_response_handler(msg);
@@ -279,19 +284,7 @@ static struct gb_interface svc_intf = {
 	.ctrl_data = NULL,
 };
 
-int gb_svc_init(void)
-{
-	gb_interface_add(&svc_intf);
-
-	return 0;
-}
-
-void gb_svc_deinit(void)
-{
-	gb_interface_remove(svc_intf.id);
-}
-
-int gb_svc_send_version(void)
+static int gb_svc_send_version(void)
 {
 	struct gb_message *req;
 	struct gb_svc_version_request req_data = {.major = GB_SVC_VERSION_MAJOR,
@@ -304,6 +297,38 @@ int gb_svc_send_version(void)
 	}
 
 	return gb_svc_msg_send(req);
+}
+
+int gb_svc_init(void)
+{
+	int ret;
+
+	gb_interface_add(&svc_intf);
+
+	ret = gb_apbridge_connection_create(AP_INF_ID, 0, SVC_INF_ID, 0);
+	if (ret < 0) {
+		LOG_ERR("Failed to create AP SVC connection");
+		return ret;
+	}
+
+	ret = gb_svc_send_version();
+	if (ret < 0) {
+		LOG_ERR("Failed to send SVC version request");
+		return ret;
+	}
+
+	ret = k_sem_take(&svc_init, SVC_INIT_TIMEOUT);
+	if (ret < 0) {
+		LOG_ERR("Failed to init");
+		return ret;
+	}
+
+	return 0;
+}
+
+void gb_svc_deinit(void)
+{
+	gb_interface_remove(svc_intf.id);
 }
 
 int gb_svc_send_module_inserted(uint8_t primary_intf_id, uint8_t intf_count, uint16_t flags)

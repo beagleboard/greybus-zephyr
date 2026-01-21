@@ -1,0 +1,9 @@
+/*
+ * Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	zephyr,greybus {};
+};

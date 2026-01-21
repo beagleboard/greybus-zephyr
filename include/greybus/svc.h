@@ -7,7 +7,7 @@
 #ifndef _GREYBUS_SVC_H_
 #define _GREYBUS_SVC_H_
 
-#include "greybus_messages.h"
+#include <stdint.h>
 
 /**
  * Intialize SVC
@@ -18,13 +18,6 @@ int gb_svc_init(void);
  * De-initialize SVC
  */
 void gb_svc_deinit(void);
-
-/**
- * Create SVC_TYPE_VERSION greybus message and queue it for sending.
- *
- * @return 0 if successful, else error.
- */
-int gb_svc_send_version(void);
 
 /**
  * Send the SVC module inserted request.
