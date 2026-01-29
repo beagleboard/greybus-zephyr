@@ -1,0 +1,19 @@
+/ {
+    zephyr,greybus {
+        compatible = "zephyr,greybus";
+        status = "okay";
+
+        gbbundle1 {
+            status = "okay";
+            compatible = "zephyr,greybus-bundle-bridged-phy";
+            pwm-controllers = <&epwm0>;
+        };
+    };
+
+    epwm0: epwm0@BEEF {
+        compatible = "vnd,pwm";
+        status = "okay";
+        reg = <0xBEEF 0x4>;
+        #pwm-cells = <3>;
+    };
+};
