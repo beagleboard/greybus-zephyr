@@ -1,0 +1,19 @@
+/ {
+    zephyr,greybus {
+        compatible = "zephyr,greybus";
+        status = "okay";
+
+        gbbundle1 {
+            status = "okay";
+            compatible = "zephyr,greybus-bundle-bridged-phy";
+            pwm-controllers = <&pwm_fake>;
+        };
+    };
+
+    pwm_fake: pwm_fake {
+        compatible = "zephyr,fake-pwm";
+        status = "okay";
+        #pwm-cells = <2>;
+        frequency = <1000000>;
+    };
+};
