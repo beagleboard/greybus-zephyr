@@ -30,6 +30,7 @@ extern const struct gb_driver gb_vibrator_driver;
 enum {
 	COUNTER_BASE = __COUNTER__
 };
+
 #define LOCAL_COUNTER (__COUNTER__ - COUNTER_BASE - 1)
 
 /* Macro to check if a type of cport is present */
@@ -42,12 +43,14 @@ enum {
 		.ngpios = DT_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), ngpios),               \
 	};
 
+// Dynamic allocation
 #define GB_PWM_PRIV_DATA(_node_id, _prop, _idx)                                                    \
-	static struct gb_pwm_channel_data gb_pwm_channel_data_arr_##_idx[1];                       \
+	static struct gb_pwm_channel_data gb_pwm_channel_data_arr_##_idx[DT_PROP_OR(               \
+		DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), channels, 1)];                           \
 	static struct gb_pwm_driver_data gb_pwm_priv_data_##_idx = {                               \
 		.channel_data = gb_pwm_channel_data_arr_##_idx,                                    \
 		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
-		.channel_num = ARRAY_SIZE(gb_pwm_channel_data_arr_##_idx),                         \
+		.channel_num = DT_PROP_OR(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), channels, 1),  \
 	};
 
 #define GB_SPI_PRIV_DATA(_node_id, _prop, _idx)                                                    \
@@ -100,10 +103,7 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 
 #define GB_CPORT(_priv, _bundle, _protocol, _driver)                                               \
 	{                                                                                          \
-		.bundle = _bundle,                                                                 \
-		.protocol = _protocol,                                                             \
-		.priv = _priv,                                                                     \
-		.driver = _driver,                                                                 \
+		.bundle = _bundle, .protocol = _protocol, .priv = _priv, .driver = _driver,        \
 	}
 
 #define _GB_CPORT(_node_id, _prop, _idx, _bundle, _protocol, _driver, PRIV_FN)                     \
