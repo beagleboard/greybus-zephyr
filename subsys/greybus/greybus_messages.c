@@ -35,8 +35,8 @@ struct gb_message *gb_message_alloc(size_t payload_len, uint8_t message_type, ui
 		return NULL;
 	}
 
-	msg->header.size = sizeof(struct gb_operation_msg_hdr) + payload_len;
-	msg->header.operation_id = operation_id;
+	msg->header.size = sys_cpu_to_le16(sizeof(struct gb_operation_msg_hdr) + payload_len);
+	msg->header.operation_id = sys_cpu_to_le16(operation_id);
 	msg->header.type = message_type;
 	msg->header.result = status;
 

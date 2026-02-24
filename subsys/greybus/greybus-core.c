@@ -185,7 +185,11 @@ int gb_stop_listening(uint16_t cport)
 		return -EINVAL;
 	}
 
-	return transport->stop_listening(cport);
+	if (transport->stop_listening) {
+		return transport->stop_listening(cport);
+	}
+
+	return 0;
 }
 
 int gb_init(const struct gb_transport_backend *transport)

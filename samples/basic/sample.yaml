@@ -17,3 +17,9 @@ tests:
     sysbuild: true
     platform_allow: beagleconnect_freedom
     extra_args: EXTRA_CONF_FILE="transport-tcpip.conf;802154-subg.conf"
+
+  sample.greybus.basic.transport.i2c:
+    build_only: true
+    sysbuild: true
+    platform_allow: beagleconnect_freedom
+    extra_args: EXTRA_CONF_FILE="transport-i2c.conf"

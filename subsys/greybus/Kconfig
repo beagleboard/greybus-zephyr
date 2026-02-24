@@ -69,7 +69,21 @@ config GREYBUS_XPORT_APBRIDGE
 	help
 	  This is intended for use in combined SVC + APBridge setups.
 
+config GREYBUS_XPORT_I2C
+	bool "Use I2C Transport for Greybus"
+	help
+	  This creates a I2C target device for Greybus multiplex over single address.
+
 endchoice
+
+if GREYBUS_XPORT_I2C
+
+config GREYBUS_XPORT_I2C_ADDRESS
+	int "Greybus Slave address"
+	help
+	  This is the address for greybus node.
+
+endif # GREYBUS_XPORT_I2C
 
 config GREYBUS_VENDOR_STRING
 	string "Greybus Vendor String"
