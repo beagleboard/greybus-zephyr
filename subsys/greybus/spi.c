@@ -42,18 +42,8 @@ LOG_MODULE_REGISTER(greybus_spi, CONFIG_GREYBUS_LOG_LEVEL);
 static void gb_spi_protocol_master_config(uint16_t cport, struct gb_message *req,
 					  const struct gb_spi_driver_data *data)
 {
-	ARG_UNUSED(data);
-
-	/* TODO: Zephyr should provide API to get these details */
-	const struct gb_spi_master_config_response resp_data = {
-		.min_speed_hz = 738,
-		.max_speed_hz = 24000000,
-		.mode = 0,
-		.flags = 0,
-		.num_chipselect = 1,
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
+	gb_transport_message_response_success_send(req, &data->master_cfg, sizeof(data->master_cfg),
+						   cport);
 }
 
 /**
@@ -73,19 +63,16 @@ static void gb_spi_protocol_device_config(uint16_t cport, struct gb_message *req
 	strncpy(dev_data.name, data->dev->name, sizeof(dev_data.name));
 
 	for (i = 0; i < data->device_num; i++) {
-		if (data->device_num == req_data->chip_select) {
+		if (i == req_data->chip_select) {
 			return gb_transport_message_response_success_send(
 				req, &data->devices[req_data->chip_select].data, sizeof(dev_data),
 				cport);
 		}
 	}
 
-	/* Use normal spi dev device
-	 * TODO: Need to be the same as master config
-	 */
-	dev_data.max_speed_hz = 24000000;
-	dev_data.mode = 0;
-	dev_data.bits_per_word = 0;
+	dev_data.max_speed_hz = data->master_cfg.max_speed_hz;
+	dev_data.mode = data->master_cfg.mode;
+	dev_data.bits_per_word = data->default_bits_per_word;
 	dev_data.device_type = GB_SPI_SPI_DEV;
 
 	gb_transport_message_response_success_send(req, &dev_data, sizeof(dev_data), cport);

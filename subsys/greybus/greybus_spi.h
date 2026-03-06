@@ -20,6 +20,8 @@ struct gb_spi_device_data {
 struct gb_spi_driver_data {
 	const struct gb_spi_device_data *devices;
 	const struct device *dev;
+	struct gb_spi_master_config_response master_cfg;
+	uint8_t default_bits_per_word;
 	uint8_t device_num;
 };
 

@@ -17,6 +17,7 @@
 #include "greybus_fw_mgmt.h"
 #include "greybus_internal.h"
 #include "greybus_raw_internal.h"
+#include <zephyr/devicetree/spi.h>
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -54,6 +55,19 @@ enum {
 	static struct gb_spi_driver_data gb_spi_priv_data_##_idx = {                               \
 		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
 		.devices = NULL,                                                                   \
+		.master_cfg = {                                                                    \
+			.min_speed_hz = 738,                                                       \
+			.max_speed_hz = DT_PROP_OR(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx),      \
+						    clock_frequency, 24000000),                  \
+			.mode = 0,                                                                 \
+			.flags = 0,                                                                \
+			.num_chipselect = DT_SPI_HAS_CS_GPIOS(                                    \
+				DT_PHANDLE_BY_IDX(_node_id, _prop, _idx))                          \
+						  ? DT_SPI_NUM_CS_GPIOS(                            \
+							  DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)) \
+						  : 1,                                               \
+		},                                                                                 \
+		.default_bits_per_word = 0,                                                       \
 		.device_num = 0,                                                                   \
 	};
 
