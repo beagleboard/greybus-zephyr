@@ -139,6 +139,18 @@ static void gb_lights_set_brightness(uint16_t cport, struct gb_message *req,
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
+static void gb_lights_set_blink(uint16_t cport, struct gb_message *req,
+				const struct gb_lights_driver_data *data)
+{
+	int ret;
+	const struct gb_lights_blink_request *req_data =
+		(const struct gb_lights_blink_request *)req->payload;
+
+	ret = gb_errno_to_op_result(led_blink(data->devs[req_data->light_id], req_data->light_id,
+					      req_data->time_on_ms, req_data->time_off_ms));
+	gb_transport_message_empty_response_send(req, ret, cport);
+}
+
 /**
  * @brief Greybus Lights Protocol operation handler
  */
@@ -156,6 +168,7 @@ static void gb_lights_handler(const void *priv, struct gb_message *msg, uint16_t
 	case GB_LIGHTS_TYPE_SET_BRIGHTNESS:
 		return gb_lights_set_brightness(cport, msg, data);
 	case GB_LIGHTS_TYPE_SET_BLINK:
+		return gb_lights_set_blink(cport, msg, data);
 	case GB_LIGHTS_TYPE_SET_COLOR:
 	case GB_LIGHTS_TYPE_SET_FADE:
 	case GB_LIGHTS_TYPE_GET_CHANNEL_FLASH_CONFIG:
