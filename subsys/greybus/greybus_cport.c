@@ -190,7 +190,8 @@ static struct gb_cport cports[] = {
 #endif // CONFIG_GREYBUS_LOOPBACK
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_CPORTS_BUNDLE_WRAPPER)};
 
-BUILD_ASSERT(GREYBUS_CPORT_COUNT == ARRAY_SIZE(cports));
+BUILD_ASSERT(GREYBUS_CPORT_COUNT == ARRAY_SIZE(cports),
+	     "Greybus cport count and cports array are out of sync");
 
 const struct gb_cport *gb_cport_get(uint16_t cport)
 {

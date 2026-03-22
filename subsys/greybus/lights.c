@@ -49,7 +49,6 @@ LOG_MODULE_REGISTER(greybus_lights, CONFIG_GREYBUS_LOG_LEVEL);
 static void gb_lights_get_lights(uint16_t cport, struct gb_message *req,
 				 const struct gb_lights_driver_data *data)
 {
-	/* TODO: Add API in zephyr to get led count */
 	const struct gb_lights_get_lights_response resp_data = {
 		.lights_count = data->lights_num,
 	};
@@ -106,13 +105,21 @@ static void gb_lights_get_light_config(uint16_t cport, struct gb_message *req,
 static void gb_lights_get_channel_config(uint16_t cport, struct gb_message *req,
 					 const struct gb_lights_driver_data *data)
 {
-	/* TODO: Implement properly */
-	const struct gb_lights_get_channel_config_response resp_data = {
+	const struct led_driver_api *api;
+	const struct gb_lights_get_channel_config_request *req_data =
+		(const struct gb_lights_get_channel_config_request *)req->payload;
+	const struct device *dev = data->devs[req_data->light_id];
+	struct gb_lights_get_channel_config_response resp_data = {
 		.max_brightness = LED_BRIGHTNESS_MAX,
 		.flags = 0,
 		.mode = 0,
 		.color = 0,
 	};
+
+	api = DEVICE_API_GET(led, dev);
+	if (api->blink) {
+		resp_data.flags |= GB_LIGHT_CHANNEL_BLINK;
+	}
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }

@@ -12,6 +12,7 @@
 #include "../platform/certificate.h"
 #include <greybus/greybus_messages.h>
 #include "../greybus_internal.h"
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 
