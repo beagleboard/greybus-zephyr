@@ -24,10 +24,14 @@ jobs:
         toolchains: arm-zephyr-eabi
 
     - name: Build
+      env:
+        MCUBOOT_PATH: twister-out/beagleconnect_freedom_cc1352p7/zephyr_gnu/greybus/samples/basic/sample.greybus.basic.transport.tcpip/mcuboot/zephyr/zephyr.bin
+        SIGNED_PATH: twister-out/beagleconnect_freedom_cc1352p7/zephyr_gnu/greybus/samples/basic/sample.greybus.basic.transport.tcpip/basic/zephyr/zephyr.signed.bin
       run: |
         mkdir dist
         west twister -T greybus
-        mv twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/basic/sample.greybus.basic.transport.tcpip/basic/zephyr/zephyr.bin dist/beagleconnect_freedom_subg.bin
+        mv ${MCUBOOT_PATH} dist/beagleconnect_freedom_subg.bin
+        dd conv=notrunc bs=1024 seek=56 if=${SIGNED_PATH} of=dist/beagleconnect_freedom_subg.bin
         xz -z dist/beagleconnect_freedom_subg.bin
     
     - name: Upload artifacts
