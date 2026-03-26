@@ -68,12 +68,40 @@ enum {
 #define GB_LIGHTS_PRIV_DATA_ITEM(_node_id, _prop, _idx)                                            \
 	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx))
 
+#define LED_STRIP_LENGTH(_node_id, _prop, _idx)                                                    \
+	DT_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), chain_length)
+
+#define GB_LIGHTS_LED_STRIP_PRIV_DATA_NAME(_node_id, _prop, _idx)                                  \
+	gb_lights_led_strip_channel_data_##_node_id_##_idx
+
+#define GB_LIGHTS_LED_STRIP_PRIV_DATA(_node_id, _prop, _idx)                                       \
+	static struct gb_led_strip_channel_data                                                    \
+		gb_lights_led_strip_channel_data_##_node_id_##_idx[LED_STRIP_LENGTH(_node_id,      \
+										    _prop, _idx)];
+
+#define GB_LIGHTS_LED_STRIPS_PRIV_DATA(_node_id)                                                   \
+	DT_FOREACH_PROP_ELEM(_node_id, led_strips, GB_LIGHTS_LED_STRIP_PRIV_DATA)                  \
+	static struct gb_led_strip_channel_data *gb_lights_led_strip_channel_data_##_node_id[] = { \
+		DT_FOREACH_PROP_ELEM_SEP(_node_id, led_strips, GB_LIGHTS_LED_STRIP_PRIV_DATA_NAME, \
+					 (, ))};
+
 #define GB_LIGHTS_PRIV_DATA(_node_id)                                                              \
+	IF_ENABLED(DT_NODE_HAS_PROP(_node_id, led_strips),                                         \
+		   (GB_LIGHTS_LED_STRIPS_PRIV_DATA(_node_id)))                                     \
 	static const struct device *gb_lights_priv_data_devs[] = {                                 \
-		DT_FOREACH_PROP_ELEM_SEP(_node_id, lights, GB_LIGHTS_PRIV_DATA_ITEM, (, ))};       \
+		IF_ENABLED(DT_NODE_HAS_PROP(_node_id, lights),                                     \
+			   (DT_FOREACH_PROP_ELEM_SEP(_node_id, lights, GB_LIGHTS_PRIV_DATA_ITEM,   \
+						     (, )), ))                                     \
+			IF_ENABLED(DT_NODE_HAS_PROP(_node_id, led_strips),                         \
+				   (DT_FOREACH_PROP_ELEM_SEP(_node_id, led_strips,                 \
+							     GB_LIGHTS_PRIV_DATA_ITEM, (, ))))};   \
 	static const struct gb_lights_driver_data gb_lights_priv_data = {                          \
-		.lights_num = ARRAY_SIZE(gb_lights_priv_data_devs),                                \
+		.led_num = DT_PROP_LEN_OR(_node_id, lights, 0),                                    \
+		.led_strip_num = DT_PROP_LEN_OR(_node_id, led_strips, 0),                          \
 		.devs = gb_lights_priv_data_devs,                                                  \
+		.led_strips_data =                                                                 \
+			COND_CODE_1(DT_NODE_HAS_PROP(_node_id, led_strips),                        \
+				    (gb_lights_led_strip_channel_data_##_node_id), (NULL)),        \
 	};
 
 #define GB_LIGHTS_PRIV_DATA_HANDLER(_node_id)                                                      \

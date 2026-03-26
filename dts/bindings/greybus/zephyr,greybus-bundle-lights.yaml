@@ -11,3 +11,7 @@ properties:
   lights:
     type: phandles
     description: Lights in the bundle
+
+  led-strips:
+    type: phandles
+    description: LED strips in the bundle
