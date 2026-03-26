@@ -5,6 +5,7 @@
  */
 
 #include "greybus/greybus_protocols.h"
+#include <stddef.h>
 #include <zephyr/ztest.h>
 #include <greybus/greybus.h>
 #include <greybus-utils/manifest.h>
@@ -13,6 +14,9 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/gpio/gpio_emul.h>
 #include <zephyr/drivers/led.h>
+#include <zephyr/dt-bindings/led/led.h>
+
+#define LIGHTS_COUNT 2
 
 struct gb_msg_with_cport gb_transport_get_message(void);
 
@@ -41,7 +45,7 @@ ZTEST(greybus_led_tests, test_get_lights)
 
 	resp_data = (const struct gb_lights_get_lights_response *)resp.msg->payload;
 
-	zassert_equal(resp_data->lights_count, 1, "Expected only 1 led");
+	zassert_equal(resp_data->lights_count, LIGHTS_COUNT, "Expected only 1 led");
 
 	gb_message_dealloc(resp.msg);
 }
@@ -50,28 +54,35 @@ ZTEST(greybus_led_tests, test_get_lights_config)
 {
 	struct gb_msg_with_cport resp;
 	const struct gb_lights_get_light_config_response *resp_data;
-	const struct gb_lights_get_light_config_request req_data = {.id = 0};
-	struct gb_message *msg = gb_message_request_alloc_with_payload(
-		&req_data, sizeof(req_data), GB_LIGHTS_TYPE_GET_LIGHT_CONFIG, false);
+	struct gb_lights_get_light_config_request *req_data;
+	struct gb_message *msg =
+		gb_message_request_alloc(sizeof(*req_data), GB_LIGHTS_TYPE_GET_LIGHT_CONFIG, false);
 
-	greybus_rx_handler(1, msg);
+	req_data = (struct gb_lights_get_light_config_request *)msg->payload;
 
-	resp = gb_transport_get_message();
+	for (size_t i = 0; i < LIGHTS_COUNT; ++i) {
+		req_data->id = i;
+		greybus_rx_handler(1, gb_message_copy(msg));
 
-	zassert(gb_message_is_success(resp.msg), "Request failed");
-	zassert_equal(gb_message_type(resp.msg), GB_RESPONSE(GB_LIGHTS_TYPE_GET_LIGHT_CONFIG),
-		      "Invalid response type");
-	zassert_equal(gb_message_payload_len(resp.msg), sizeof(*resp_data),
-		      "Invalid response data");
+		resp = gb_transport_get_message();
 
-	resp_data = (const struct gb_lights_get_light_config_response *)resp.msg->payload;
+		zassert(gb_message_is_success(resp.msg), "Request failed");
+		zassert_equal(gb_message_type(resp.msg),
+			      GB_RESPONSE(GB_LIGHTS_TYPE_GET_LIGHT_CONFIG),
+			      "Invalid response type");
+		zassert_equal(gb_message_payload_len(resp.msg), sizeof(*resp_data),
+			      "Invalid response data");
 
-	zassert_equal(resp_data->channel_count, 1, "Expected only 1 channel");
+		resp_data = (const struct gb_lights_get_light_config_response *)resp.msg->payload;
 
+		zassert_equal(resp_data->channel_count, i + 1, "Expected only 1 channel");
+	}
+
+        gb_message_dealloc(msg);
 	gb_message_dealloc(resp.msg);
 }
 
-ZTEST(greybus_led_tests, test_get_channel_config)
+ZTEST(greybus_led_tests, test_get_channel_config1)
 {
 	struct gb_msg_with_cport resp;
 	const struct gb_lights_get_channel_config_response *resp_data;
@@ -102,5 +113,45 @@ ZTEST(greybus_led_tests, test_get_channel_config)
 	zassert_equal(resp_data->flags, 0,
 		      "Flags should be 0 since generic blink is not implemented in zephyr yet.");
 
+	gb_message_dealloc(resp.msg);
+}
+
+ZTEST(greybus_led_tests, test_get_channel_config2)
+{
+	struct gb_msg_with_cport resp;
+	const struct gb_lights_get_channel_config_response *resp_data;
+	struct gb_lights_get_channel_config_request *req_data;
+	struct gb_message *msg = gb_message_request_alloc(sizeof(*req_data),
+							  GB_LIGHTS_TYPE_GET_CHANNEL_CONFIG, false);
+
+	req_data = (struct gb_lights_get_channel_config_request *)msg->payload;
+	req_data->light_id = 1;
+
+	for (size_t i = 0; i < 2; ++i) {
+		req_data->channel_id = i;
+		greybus_rx_handler(1, gb_message_copy(msg));
+
+		resp = gb_transport_get_message();
+
+		zassert(gb_message_is_success(resp.msg), "Request failed");
+		zassert_equal(gb_message_type(resp.msg),
+			      GB_RESPONSE(GB_LIGHTS_TYPE_GET_CHANNEL_CONFIG),
+			      "Invalid response type");
+		zassert_equal(gb_message_payload_len(resp.msg), sizeof(*resp_data),
+			      "Invalid response data");
+
+		resp_data = (const struct gb_lights_get_channel_config_response *)resp.msg->payload;
+
+		zassert_equal(resp_data->mode, 0,
+			      "Mode should be 0 since it is not implemented yet");
+		zassert_equal(resp_data->color,
+			      LED_COLOR_ID_RED + LED_COLOR_ID_GREEN + LED_COLOR_ID_BLUE,
+			      "Should be RGB LED");
+		zassert_equal(resp_data->max_brightness, UINT8_MAX, "LED strip brightness is 255");
+		zassert_equal(resp_data->flags, GB_LIGHT_CHANNEL_MULTICOLOR,
+			      "Should be multicolor LED");
+	}
+
+        gb_message_dealloc(msg);
 	gb_message_dealloc(resp.msg);
 }
