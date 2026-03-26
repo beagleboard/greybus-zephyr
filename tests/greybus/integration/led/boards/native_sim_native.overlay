@@ -4,13 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/dt-bindings/led/led.h>
+
 / {
 	zephyr,greybus {
 		gbbundle1 {
 			status = "okay";
 			compatible = "zephyr,greybus-bundle-lights";
-			/* TODO: Fix after https://github.com/zephyrproject-rtos/zephyr/pull/106012 */
-			lights = <&{/leds}>;
+			lights = <&leds>;
+                        led-strips = <&rgb_led_strip>;
 		};
+	};
+
+	rgb_led_strip: rgb_strip {
+		compatible = "ti,tlc59731";
+		gpios = <&gpio0 7 (GPIO_PULL_DOWN | GPIO_ACTIVE_HIGH)>;
+		chain-length = <2>;
+		color-mapping = <LED_COLOR_ID_BLUE
+				 LED_COLOR_ID_GREEN
+				 LED_COLOR_ID_RED>;
+		status = "okay";
 	};
 };
