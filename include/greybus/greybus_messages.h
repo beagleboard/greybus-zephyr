@@ -43,6 +43,18 @@ struct gb_message {
 };
 
 /*
+ * Return the length of a greybus message from message header.
+ *
+ * @param hdr: greybus header
+ *
+ * @return message length
+ */
+static inline uint16_t gb_hdr_message_len(const struct gb_operation_msg_hdr *hdr)
+{
+	return sys_le16_to_cpu(hdr->size);
+}
+
+/*
  * Return the paylaod length of a greybus message from message header.
  *
  * @param hdr: greybus header
@@ -51,7 +63,19 @@ struct gb_message {
  */
 static inline size_t gb_hdr_payload_len(const struct gb_operation_msg_hdr *hdr)
 {
-	return sys_le16_to_cpu(hdr->size) - sizeof(struct gb_operation_msg_hdr);
+	return gb_hdr_message_len(hdr) - sizeof(struct gb_operation_msg_hdr);
+}
+
+/*
+ * Return the length of a greybus message.
+ *
+ * @param msg: Greybus message
+ *
+ * @return message length
+ */
+static inline size_t gb_message_len(const struct gb_message *msg)
+{
+	return gb_hdr_message_len(&msg->header);
 }
 
 /*
