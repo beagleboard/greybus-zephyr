@@ -1,0 +1,10 @@
+/ {
+    aliases {
+        camera0 = &fake_cam;
+    };
+
+    fake_cam: fake_camera {
+        compatible = "zephyr,fake-camera";
+        status = "okay";
+    };
+};

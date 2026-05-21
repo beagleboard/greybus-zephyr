@@ -1,0 +1,3 @@
+description: Fake Camera Driver for Simulation
+compatible: "zephyr,fake-camera"
+include: base.yaml
