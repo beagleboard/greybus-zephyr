@@ -196,9 +196,10 @@ static void uart_irq_cb(const struct device *dev, void *user_data)
 	struct gb_uart_recv_data_request *req_data;
 	int ret;
 
-	if (!uart_irq_update(dev) && !uart_irq_rx_ready(dev)) {
-		return;
-	}
+  uart_irq_update(dev);
+  if (!uart_irq_rx_ready(dev)) {
+      return;
+  }
 
 	req = gb_message_request_alloc(MAX_RX_BUF_SIZE, GB_UART_TYPE_RECEIVE_DATA, true);
 	if (!req) {

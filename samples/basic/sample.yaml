@@ -9,17 +9,17 @@ tests:
   sample.greybus.basic.transport.dummy:
     build_only: true
     sysbuild: true
-    platform_allow: beagleconnect_freedom
+    platform_allow: beagleconnect_freedom@C7/cc1352p7
     extra_args: EXTRA_CONF_FILE="transport-dummy.conf"
 
   sample.greybus.basic.transport.tcpip:
     build_only: true
     sysbuild: true
-    platform_allow: beagleconnect_freedom
+    platform_allow: beagleconnect_freedom@C7/cc1352p7
     extra_args: EXTRA_CONF_FILE="transport-tcpip.conf;802154-subg.conf"
 
   sample.greybus.basic.transport.i2c:
     build_only: true
     sysbuild: true
-    platform_allow: beagleconnect_freedom
+    platform_allow: beagleconnect_freedom@C7/cc1352p7
     extra_args: EXTRA_CONF_FILE="transport-i2c.conf"

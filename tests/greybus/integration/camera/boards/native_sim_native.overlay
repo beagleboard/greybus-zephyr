@@ -7,4 +7,11 @@
         compatible = "zephyr,fake-camera";
         status = "okay";
     };
+
+    zephyr_greybus {
+        compatible = "zephyr,greybus";
+        status = "okay";
+        
+        //add bundle and cport once the greybus handlers written
+    };
 };
