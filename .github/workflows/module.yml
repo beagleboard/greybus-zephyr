@@ -25,8 +25,8 @@ jobs:
 
     - name: Build
       env:
-        MCUBOOT_PATH: twister-out/beagleconnect_freedom_cc1352p7/zephyr_gnu/greybus/samples/basic/sample.greybus.basic.transport.tcpip/mcuboot/zephyr/zephyr.bin
-        SIGNED_PATH: twister-out/beagleconnect_freedom_cc1352p7/zephyr_gnu/greybus/samples/basic/sample.greybus.basic.transport.tcpip/basic/zephyr/zephyr.signed.bin
+        MCUBOOT_PATH: twister-out/beagleconnect_freedom@C7_cc1352p7/zephyr_gnu/greybus/samples/basic/sample.greybus.basic.transport.tcpip/mcuboot/zephyr/zephyr.bin
+        SIGNED_PATH: twister-out/beagleconnect_freedom@C7_cc1352p7/zephyr_gnu/greybus/samples/basic/sample.greybus.basic.transport.tcpip/basic/zephyr/zephyr.signed.bin
       run: |
         mkdir dist
         west twister -T greybus
