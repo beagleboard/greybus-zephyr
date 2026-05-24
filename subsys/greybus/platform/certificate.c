@@ -55,7 +55,7 @@ int greybus_tls_init(void)
 
 		LOG_DBG("Adding Server Certificate (Public Key) (%zu bytes)",
 			sizeof(greybus_tls_builtin_server_cert));
-		r = tls_credential_add(GB_TLS_SERVER_CERT_TAG, TLS_CREDENTIAL_SERVER_CERTIFICATE,
+		r = tls_credential_add(GB_TLS_SERVER_CERT_TAG, TLS_CREDENTIAL_PUBLIC_CERTIFICATE,
 				       greybus_tls_builtin_server_cert,
 				       sizeof(greybus_tls_builtin_server_cert));
 		if (r < 0) {
