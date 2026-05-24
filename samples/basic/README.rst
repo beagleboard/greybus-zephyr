@@ -29,7 +29,7 @@ Supported Transports
 
    .. code-block:: bash
 
-      west build -b beagleconnect_freedom samples/greybus/basic \
+      west build -b beagleconnect_freedom/cc1352p7 samples/greybus/basic \
           -- -DEXTRA_CONF_FILE="transport-dummy.conf"
 
 2. **TCP/IP Transport**
@@ -40,7 +40,7 @@ Supported Transports
 
    .. code-block:: bash
 
-      west build -b beagleconnect_freedom samples/greybus/basic \
+      west build -b beagleconnect_freedom/cc1352p7 samples/greybus/basic \
           -- -DEXTRA_CONF_FILE="transport-tcpip.conf;802154-subg.conf"
 
 Requirements
@@ -50,7 +50,7 @@ Requirements
 - Greybus subsystem enabled
 - A supported platform, currently:
   
-  - ``beagleconnect_freedom``
+  - ``beagleconnect_freedom/cc1352p7``
 
 Testing
 *******
@@ -62,7 +62,7 @@ The following test configurations are defined in :file:`sample.yaml`:
 - ``sample.greybus.basic.transport.tcpip``  
   Builds the sample using ``transport-tcpip.conf`` and ``802154-subg.conf``.
 
-These are build-only tests verified on the ``beagleconnect_freedom`` platform.
+These are build-only tests verified on the ``beagleconnect_freedom/cc1352p7`` platform.
 
 References
 **********
