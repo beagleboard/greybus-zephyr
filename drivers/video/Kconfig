@@ -1,0 +1,5 @@
+config FAKE_CAMERA
+	bool "Fake Camera Driver"
+	default n
+	help
+	  Enable the fake camera driver for simulation testing
