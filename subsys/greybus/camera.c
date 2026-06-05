@@ -43,7 +43,6 @@
 
 LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 
-
 #define GB_CAMERA_VERSION_MAJOR 0
 #define GB_CAMERA_VERSION_MINOR 1
 
@@ -57,124 +56,175 @@ LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 #define STATE_CONFIGURED   3
 #define STATE_STREAMING    4
 
-struct gb_camera_info {
-	unsigned int cport;
-	struct device *dev;
-	uint8_t state;
-};
-
-static struct gb_camera_info *info = NULL;
-
+/**
+ * @brief Handler for the protocol version operation
+ * returns the supported Greubus Camera Class major and minor version numbers to the host.
+ * @param cport- The CPort number
+ * @param msg- The incoming greybus message request
+ */
 static void gb_camera_protocol_version(uint16_t cport, struct gb_message *msg)
 {
-    struct gb_camera_version_response response = {
-        .major = GB_CAMERA_VERSION_MAJOR,
-        .minor = GB_CAMERA_VERSION_MINOR,
-    };
+	struct gb_camera_version_response response = {
+		.major = GB_CAMERA_VERSION_MAJOR,
+		.minor = GB_CAMERA_VERSION_MINOR,
+	};
 
-    LOG_DBG("gb_camera_protocol_version() called");
+	LOG_DBG("gb_camera_protocol_version() called");
 
-    gb_transport_message_response_success_send(msg, &response, sizeof(response), cport);
+	gb_transport_message_response_success_send(msg, &response, sizeof(response), cport);
 }
 
-static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg)
+/**
+ * @brief Handler for the capabilities operation.
+ * This queries the underlying zephyr video device for supported formats and the resolution, then
+ * translates them into the Greybus ExtCSI payload format, and dynamically allocates the response
+ * buffer to send back
+ *
+ * @note Currently, this translation explicitly maps only the JPEG format (VIDEO_PX_FMT_JPEG) and
+ * stubs the framerate to a default 30fps. Support for mapping additional Zephyr pixel formats to
+ * greybus formats should be expanded here in the future.
+ *
+ * @param data- Pointer to camera driver data
+ * @param cport- The CPort number
+ * @param msg- Incoming greybus message request
+ */
+static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
 {
-    struct gb_camera_capabilities_response *response;
-    struct video_caps vcaps;
-    size_t payload_size;
-    size_t total_size;
-    int ret;
+	struct gb_camera_capabilities_response *response;
+	struct video_caps vcaps;
+	struct gb_camera_csi_params *csi_header;
+	struct gb_camera_format_desc *format;
+	size_t payload_size;
+	size_t total_size;
+	uint8_t num_formats = 0;
+	int ret, i;
 
-    LOG_DBG("gb_camera_capabilities() + ");
+	LOG_DBG("gb_camera_capabilities() + ");
 
-    if (info == NULL || info->state < STATE_UNCONFIGURED) {
-        LOG_ERR("Camera in invalid state");
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        return;
-    }
+	if (data == NULL || data->info == NULL || data->info->state < STATE_UNCONFIGURED) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
 
-    ret = video_get_caps(info->dev, &vcaps);
-    if (ret) {
-        LOG_ERR("Failed to get video caps from device");
-        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
-        return;
-    }
+	ret = video_get_caps(data->dev, &vcaps);
+	if (ret) {
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
 
-    /* to determine the payload size 
-     * (For now, we assume the Greybus spec requires a 4-byte dummy payload. 
-     *  write the real translation logic kater)
-     */
-    payload_size = 4; 
-    total_size = sizeof(*response) + payload_size;
+	while (vcaps.format_caps[num_formats].pixelformat != 0) {
+		num_formats++;
+	}
+	if (num_formats == 0) {
+		LOG_ERR("No video formats found from device");
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
 
-    response = calloc(1, total_size);
-    if (!response) {
-        LOG_ERR("Failed to allocate capabilities response");
-        gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
-        return;
-    }
+	payload_size = sizeof(struct gb_camera_csi_params) +
+		       (num_formats * sizeof(struct gb_camera_format_desc));
+	total_size = sizeof(*response) + payload_size;
 
-    response->capabilities[0] = 0xAA; 
-    response->capabilities[1] = 0xBB; 
-    response->capabilities[2] = 0xCC; 
-    response->capabilities[3] = 0xDD; 
+	response = calloc(1, total_size);
+	if (!response) {
+		gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
+		return;
+	}
 
-    gb_transport_message_response_success_send(msg, response, total_size, cport);
+	csi_header = (struct gb_camera_csi_params *)&response->capabilities[0];
+	format = (struct gb_camera_format_desc *)&response
+			 ->capabilities[sizeof(struct gb_camera_csi_params)];
 
-    free(response);
+	csi_header->num_formats = num_formats;
 
-    LOG_DBG("gb_camera_capabilities()- ");
+	for (i = 0; i < num_formats; i++) {
+		/* Map Pixel Format (Zephyr V4L2-style macro -> Greybus macro) */
+		if (vcaps.format_caps[i].pixelformat == VIDEO_PIX_FMT_JPEG) {
+			format[i].format = GB_CAMERA_CAP_FMT_JPEG;
+		} else {
+			format[i].format = 0;
+			LOG_WRN("Unsupported pixel format found during translation");
+		}
+
+		format[i].width = vcaps.format_caps[i].width_max;
+		format[i].height = vcaps.format_caps[i].height_max;
+		format[i].fps = 30; // safe default
+	}
+
+	gb_transport_message_response_success_send(msg, response, total_size, cport);
+
+	free(response);
+	LOG_DBG("gb_camera_capabilities() - ");
 }
 
+/**
+ * @brief Callback invoked when the greybus host connects to the cemra cport
+ * Initializes camera protocol state and binds the Zephyr video device.
+ * @param priv- Private driver data pointer
+ * @param cport= The CPort number that was connected.
+ */
 static void gb_camera_connected(const void *priv, uint16_t cport)
 {
+    struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
+
+    if (!data) {
+        LOG_ERR("No driver data provided in priv!");
+        return;
+    }
+
     LOG_DBG("gb_camera_connected + ");
 
-    info = calloc(1, sizeof(*info));
-    if (info == NULL) {
-        LOG_ERR("Failed to allocate memory");
-        return;
-    }
+    memset(data->info, 0, sizeof(*data->info));
+    data->dev = DEVICE_DT_GET(DT_ALIAS(camera0));
 
-    info->cport = cport;
-    info->state = STATE_INSERTED;
-    info->dev = (struct device *)DEVICE_DT_GET(DT_ALIAS(camera0));
-    
-    if (!device_is_ready(info->dev)) {
+    if (!device_is_ready(data->dev)) {
         LOG_ERR("Camera device not ready");
-        free(info);
-        info = NULL;
         return;
     }
 
-    info->state = STATE_UNCONFIGURED;
+    data->info->state = STATE_UNCONFIGURED;
 
     LOG_DBG("gb_camera_connected- ");
 }
 
+/**
+ * @brief Callbak invoked when the greybus host disconnects.
+ * Frees memory resources and also resets the camera states
+ * @param priv- Private driver data pointer
+ */
 static void gb_camera_disconnected(const void *priv)
 {
+    struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
+
     LOG_DBG("gb_camera_disconnected");
-    if (info) {
-        free(info);
-        info = NULL;
+    if (data) {
+        data->info->state = STATE_REMOVED;
     }
 }
 
+/**
+ * @brief Main operation handler for the Greybus camera class
+ * Routes the inoming greybus messages to their specific handlers based on the operation type.
+ * @param priv- Private driver data pointer
+ * @param msg- Incoming greybus message request
+ * @param cport- The CPort number
+ */
 static void gb_camera_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-    switch (gb_message_type(msg)) {
-    case GB_CAMERA_TYPE_PROTOCOL_VERSION:
-        gb_camera_protocol_version(cport, msg);
-        break;
-    case GB_CAMERA_TYPE_CAPABILITIES:
-        gb_camera_capabilities(cport, msg);
-        break;
-    default:
-        LOG_ERR("Invalid type: %d", gb_message_type(msg));
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        break;
-    }
+  const struct gb_camera_driver_data *data= priv;
+
+  switch (gb_message_type(msg)) {
+	case GB_CAMERA_TYPE_PROTOCOL_VERSION:
+		gb_camera_protocol_version(cport, msg);
+		break;
+	case GB_CAMERA_TYPE_CAPABILITIES:
+		gb_camera_capabilities(cport, msg, data);
+		break;
+	default:
+		LOG_ERR("Invalid type: %d", gb_message_type(msg));
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		break;
+	}
 }
 
 const struct gb_driver gb_camera_driver = {
