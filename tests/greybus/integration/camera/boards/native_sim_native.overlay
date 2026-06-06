@@ -12,6 +12,11 @@
         compatible = "zephyr,greybus";
         status = "okay";
         
-        //add bundle and cport once the greybus handlers written
+        bundle_camera: bundle_camera {
+            compatible = "zephyr,greybus-bundle-camera";
+            status = "okay";
+            /* This is the magic property our macro loops over! */
+            cameras = <&fake_cam>; 
+        };
     };
 };
