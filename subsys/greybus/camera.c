@@ -35,7 +35,7 @@
 #include <zephyr/drivers/video.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
-
+#include "greybus_heap.h"
 #include <greybus/greybus.h>
 #include <greybus/greybus_protocols.h>
 #include "greybus_transport.h"
@@ -57,8 +57,6 @@ LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 #define STATE_CONFIGURED   3
 #define STATE_STREAMING    4
 
-static struct gb_camera_info camera_state;
-
 /**
  * @brief Handler for the protocol version operation
  * returns the supported Greubus Camera Class major and minor version numbers to the host.
@@ -71,8 +69,6 @@ static void gb_camera_protocol_version(uint16_t cport, struct gb_message *msg)
 		.major = GB_CAMERA_VERSION_MAJOR,
 		.minor = GB_CAMERA_VERSION_MINOR,
 	};
-
-	LOG_DBG("gb_camera_protocol_version() called");
 
 	gb_transport_message_response_success_send(msg, &response, sizeof(response), cport);
 }
@@ -95,7 +91,7 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 				   const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_capabilities_response *response;
-	struct video_caps vcaps;
+	struct video_caps vcaps = {0};
 	struct gb_camera_csi_params *csi_header;
 	struct gb_camera_format_desc *format;
 	size_t payload_size;
@@ -103,9 +99,7 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 	uint8_t num_formats = 0;
 	int ret, i;
 
-	LOG_DBG("gb_camera_capabilities() + ");
-
-	if (data == NULL || data->info == NULL || data->info->state < STATE_UNCONFIGURED) {
+	if (data == NULL || data->info.state < STATE_UNCONFIGURED) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
@@ -129,11 +123,12 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 		       (num_formats * sizeof(struct gb_camera_format_desc));
 	total_size = sizeof(*response) + payload_size;
 
-	response = calloc(1, total_size);
+	response = gb_alloc(total_size);
 	if (!response) {
 		gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
 		return;
 	}
+	memset(response, 0, total_size);
 
 	csi_header = (struct gb_camera_csi_params *)&response->capabilities[0];
 	format = (struct gb_camera_format_desc *)&response
@@ -157,8 +152,7 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 
 	gb_transport_message_response_success_send(msg, response, total_size, cport);
 
-	free(response);
-	LOG_DBG("gb_camera_capabilities() - ");
+	gb_free(response);
 }
 
 /**
@@ -176,20 +170,14 @@ static void gb_camera_connected(const void *priv, uint16_t cport)
 		return;
 	}
 
-	LOG_DBG("gb_camera_connected + ");
-
-	data->info = &camera_state;
-	memset(data->info, 0, sizeof(*data->info));
-	data->dev = DEVICE_DT_GET(DT_ALIAS(camera0));
+	memset(&data->info, 0, sizeof(data->info));
 
 	if (!device_is_ready(data->dev)) {
 		LOG_ERR("Camera device not ready");
 		return;
 	}
 
-	data->info->state = STATE_UNCONFIGURED;
-
-	LOG_DBG("gb_camera_connected- ");
+	data->info.state = STATE_UNCONFIGURED;
 }
 
 /**
@@ -201,9 +189,8 @@ static void gb_camera_disconnected(const void *priv)
 {
 	struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
 
-	LOG_DBG("gb_camera_disconnected");
-	if (data && data->info) {
-		data->info->state = STATE_REMOVED;
+	if (data) {
+		data->info.state = STATE_REMOVED;
 	}
 }
 

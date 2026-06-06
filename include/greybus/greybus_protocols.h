@@ -1556,6 +1556,7 @@ struct gb_sdio_event_request {
 /* Camera */
 
 /* Greybus Camera request types */
+#define GB_CAMERA_TYPE_PROTOCOL_VERSION  0x01
 #define GB_CAMERA_TYPE_CAPABILITIES      0x02
 #define GB_CAMERA_TYPE_CONFIGURE_STREAMS 0x03
 #define GB_CAMERA_TYPE_CAPTURE           0x04
