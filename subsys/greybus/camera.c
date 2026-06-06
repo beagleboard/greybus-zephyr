@@ -34,6 +34,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/video.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <greybus/greybus.h>
 #include <greybus/greybus_protocols.h>
@@ -55,6 +56,8 @@ LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 #define STATE_UNCONFIGURED 2
 #define STATE_CONFIGURED   3
 #define STATE_STREAMING    4
+
+static struct gb_camera_info camera_state;
 
 /**
  * @brief Handler for the protocol version operation
@@ -88,7 +91,8 @@ static void gb_camera_protocol_version(uint16_t cport, struct gb_message *msg)
  * @param cport- The CPort number
  * @param msg- Incoming greybus message request
  */
-static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
+				   const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_capabilities_response *response;
 	struct video_caps vcaps;
@@ -140,15 +144,15 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg, const
 	for (i = 0; i < num_formats; i++) {
 		/* Map Pixel Format (Zephyr V4L2-style macro -> Greybus macro) */
 		if (vcaps.format_caps[i].pixelformat == VIDEO_PIX_FMT_JPEG) {
-			format[i].format = GB_CAMERA_CAP_FMT_JPEG;
+			format[i].format = sys_cpu_to_le32(GB_CAMERA_CAP_FMT_JPEG);
 		} else {
-			format[i].format = 0;
+			format[i].format = sys_cpu_to_le32(0);
 			LOG_WRN("Unsupported pixel format found during translation");
 		}
 
-		format[i].width = vcaps.format_caps[i].width_max;
-		format[i].height = vcaps.format_caps[i].height_max;
-		format[i].fps = 30; // safe default
+		format[i].width = sys_cpu_to_le16(vcaps.format_caps[i].width_max);
+		format[i].height = sys_cpu_to_le16(vcaps.format_caps[i].height_max);
+		format[i].fps = sys_cpu_to_le16(30); // safe default
 	}
 
 	gb_transport_message_response_success_send(msg, response, total_size, cport);
@@ -165,26 +169,27 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg, const
  */
 static void gb_camera_connected(const void *priv, uint16_t cport)
 {
-    struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
+	struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
 
-    if (!data) {
-        LOG_ERR("No driver data provided in priv!");
-        return;
-    }
+	if (!data) {
+		LOG_ERR("No driver data provided in priv!");
+		return;
+	}
 
-    LOG_DBG("gb_camera_connected + ");
+	LOG_DBG("gb_camera_connected + ");
 
-    memset(data->info, 0, sizeof(*data->info));
-    data->dev = DEVICE_DT_GET(DT_ALIAS(camera0));
+	data->info = &camera_state;
+	memset(data->info, 0, sizeof(*data->info));
+	data->dev = DEVICE_DT_GET(DT_ALIAS(camera0));
 
-    if (!device_is_ready(data->dev)) {
-        LOG_ERR("Camera device not ready");
-        return;
-    }
+	if (!device_is_ready(data->dev)) {
+		LOG_ERR("Camera device not ready");
+		return;
+	}
 
-    data->info->state = STATE_UNCONFIGURED;
+	data->info->state = STATE_UNCONFIGURED;
 
-    LOG_DBG("gb_camera_connected- ");
+	LOG_DBG("gb_camera_connected- ");
 }
 
 /**
@@ -194,12 +199,12 @@ static void gb_camera_connected(const void *priv, uint16_t cport)
  */
 static void gb_camera_disconnected(const void *priv)
 {
-    struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
+	struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
 
-    LOG_DBG("gb_camera_disconnected");
-    if (data) {
-        data->info->state = STATE_REMOVED;
-    }
+	LOG_DBG("gb_camera_disconnected");
+	if (data && data->info) {
+		data->info->state = STATE_REMOVED;
+	}
 }
 
 /**
@@ -211,9 +216,9 @@ static void gb_camera_disconnected(const void *priv)
  */
 static void gb_camera_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-  const struct gb_camera_driver_data *data= priv;
+	const struct gb_camera_driver_data *data = priv;
 
-  switch (gb_message_type(msg)) {
+	switch (gb_message_type(msg)) {
 	case GB_CAMERA_TYPE_PROTOCOL_VERSION:
 		gb_camera_protocol_version(cport, msg);
 		break;
@@ -228,7 +233,7 @@ static void gb_camera_handler(const void *priv, struct gb_message *msg, uint16_t
 }
 
 const struct gb_driver gb_camera_driver = {
-    .connected = gb_camera_connected,
-    .disconnected = gb_camera_disconnected,
-    .op_handler = gb_camera_handler,
+	.connected = gb_camera_connected,
+	.disconnected = gb_camera_disconnected,
+	.op_handler = gb_camera_handler,
 };
