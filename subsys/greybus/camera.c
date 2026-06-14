@@ -156,10 +156,110 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 }
 
 /**
+ * @brief Handler for the configure streams operation
+ * @param cport- the CPort number
+ * @param msg- incoming gb message request
+ * @param data- pointer to camera driver data
+ */
+static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+{
+    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+    struct video_format fmt;
+    int ret;
+
+    if (drv_data == NULL || drv_data->info.state < STATE_UNCONFIGURED) {
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
+
+    /*TODO- Parse the requested resolution from the incoming msg payload */
+    /*for now, we are hardcoding to a format that we know the driver supports */
+    fmt.pixelformat = VIDEO_PIX_FMT_JPEG;
+    fmt.width = 640;
+    fmt.height = 480;
+    fmt.pitch = 640 * 2; 
+
+    ret = video_set_format(drv_data->dev, &fmt);
+    if (ret) {
+        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+        return;
+    }
+
+    drv_data->info.state = STATE_CONFIGURED;
+
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+/**
+ * @brief Handler for the capture operation.
+ * @param cport- the CPort number
+ * @param msg- incoming gb message request
+ * @param data- pointer to camera driver data
+ */
+static void gb_camera_capture(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+{
+    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+    struct video_buffer *vbuf;
+    int ret;
+
+    if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
+
+    if (drv_data->info.state != STATE_STREAMING) {
+        ret = video_stream_start(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
+        if (ret) {
+            gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+            return;
+        }
+        drv_data->info.state = STATE_STREAMING;
+    }
+
+    ret = video_dequeue(drv_data->dev, &vbuf, K_MSEC(1000)); // Removed VIDEO_EP_OUT
+    if (ret) {
+        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+        return;
+    }
+
+    /*TODO- Dynamically allocate gb response msg, copy vbuf->buffer 
+     *(size:vbuf->bytesused) into it send it back to the host */
+
+    video_enqueue(drv_data->dev, vbuf);
+  
+    /*stub: sending empty success until the payload packing is done */
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+/**
+ * @brief Handler for the flush operation
+ * @param cport- the CPort number
+ * @param msg- incoming gb message request
+ * @param data- Pointer to camera driver data
+ */
+static void gb_camera_flush(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+{
+    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+
+    if (drv_data == NULL || drv_data->info.state < STATE_STREAMING) {
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
+
+    video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT); 
+
+    video_flush(drv_data->dev, true);
+
+    drv_data->info.state = STATE_CONFIGURED;
+
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+/**
  * @brief Callback invoked when the greybus host connects to the cemra cport
  * Initializes camera protocol state and binds the Zephyr video device.
  * @param priv- Private driver data pointer
- * @param cport= The CPort number that was connected.
+ * @param cport- The CPort number that was connected.
  */
 static void gb_camera_connected(const void *priv, uint16_t cport)
 {
@@ -212,6 +312,15 @@ static void gb_camera_handler(const void *priv, struct gb_message *msg, uint16_t
 	case GB_CAMERA_TYPE_CAPABILITIES:
 		gb_camera_capabilities(cport, msg, data);
 		break;
+  case GB_CAMERA_TYPE_CONFIGURE_STREAMS:
+    gb_camera_configure_streams(cport, msg, data);
+    break;
+   case GB_CAMERA_TYPE_CAPTURE:
+     gb_camera_capture(cport, msg, data);
+        break;
+    case GB_CAMERA_TYPE_FLUSH:
+        gb_camera_flush(cport, msg, data);
+        break;
 	default:
 		LOG_ERR("Invalid type: %d", gb_message_type(msg));
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
