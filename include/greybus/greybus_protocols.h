@@ -1556,6 +1556,7 @@ struct gb_sdio_event_request {
 /* Camera */
 
 /* Greybus Camera request types */
+#define GB_CAMERA_TYPE_PROTOCOL_VERSION  0x01
 #define GB_CAMERA_TYPE_CAPABILITIES      0x02
 #define GB_CAMERA_TYPE_CONFIGURE_STREAMS 0x03
 #define GB_CAMERA_TYPE_CAPTURE           0x04
@@ -1601,6 +1602,29 @@ struct gb_camera_configure_streams_response {
 	__le32 data_rate;
 	struct gb_camera_stream_config_response config[];
 };
+
+/* Greybus Camera Capabilites- for the GB_CAMERA_TYPE_CAPABILITIES operation */ 
+struct gb_camera_csi_params {
+    __u8 num_formats;
+    __u8 reserved[3];
+} __packed;
+
+struct gb_camera_format_desc {
+    __le32 format; 
+    __le16 width;
+    __le16 height;
+    __le16 fps;
+    __le16 reserved;
+} __packed;
+
+struct gb_camera_version_response {
+    __u8 major;
+    __u8 minor;
+} __packed;
+
+struct gb_camera_capabilities_response {
+    __u8 capabilities[0];
+} __packed;
 
 /* Greybus Camera Capture request payload - response has no payload */
 struct gb_camera_capture_request {

@@ -1,0 +1,13 @@
+# Copyright (c) 2026, Pavithra CP BeagleBoard.org
+# SPDX-License-Identifier: Apache-2.0
+
+description: Greybus Bundle for Camera class
+
+compatible: "zephyr,greybus-bundle-camera"
+
+include: [base.yaml]
+
+properties:
+  cameras:
+    type: phandles
+    description: Camera devices in the bundle
