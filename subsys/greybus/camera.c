@@ -1,5 +1,6 @@
 /**
  * Copyright (c) 2015 Google, Inc.
+ * Copyright (c) 2026 Pavithra C.P, BeagleBoard.org
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,23 +30,27 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <greybus/greybus.h>
-#include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/video.h>
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
+#include <zephyr/sys/byteorder.h>
+#include "greybus_heap.h"
+#include <greybus/greybus.h>
+#include <greybus/greybus_protocols.h>
+#include "greybus_transport.h"
+#include "greybus_internal.h"
+#include "greybus_camera.h"
 
-#include "camera-gb.h"
+LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 
 #define GB_CAMERA_VERSION_MAJOR 0
 #define GB_CAMERA_VERSION_MINOR 1
 
-/* Camera protocol error codes */
 #define GB_CAM_OP_INVALID_STATE 0x80
 
-/* Reserved value for not used data type */
 #define GB_CAM_DT_NOT_USED 0x00
 
-/* Camera protocol operational model */
 #define STATE_REMOVED      0
 #define STATE_INSERTED     1
 #define STATE_UNCONFIGURED 2
@@ -53,479 +58,278 @@ LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 #define STATE_STREAMING    4
 
 /**
- * Camera protocol private information.
+ * @brief Handler for the protocol version operation
+ * returns the supported Greubus Camera Class major and minor version numbers to the host.
+ * @param cport- The CPort number
+ * @param msg- The incoming greybus message request
  */
-struct gb_camera_info {
-	/** CPort from greybus */
-	unsigned int cport;
-	/** Camera driver handle */
-	struct device *dev;
-	/** Camera operational model */
-	uint8_t state;
-};
-
-static struct gb_camera_info *info = NULL;
-
-/**
- * @brief Returns the major and minor Greybus Camera Protocol version number
- *
- * This operation returns the major and minor version number supported by
- * Greybus Camera Protocol
- *
- * @param operation Pointer to structure of Greybus operation.
- * @return GB_OP_SUCCESS on success, error code on failure.
- */
-static uint8_t gb_camera_protocol_version(struct gb_operation *operation)
+static void gb_camera_protocol_version(uint16_t cport, struct gb_message *msg)
 {
-	struct gb_camera_version_response *response;
+	struct gb_camera_version_response response = {
+		.major = GB_CAMERA_VERSION_MAJOR,
+		.minor = GB_CAMERA_VERSION_MINOR,
+	};
 
-	LOG_DBG("gb_camera_protocol_version() + ");
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->major = GB_CAMERA_VERSION_MAJOR;
-	response->minor = GB_CAMERA_VERSION_MINOR;
-
-	LOG_DBG("gb_camera_protocol_version() - ");
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(msg, &response, sizeof(response), cport);
 }
 
 /**
- * @brief Get Camera capabilities
+ * @brief Handler for the capabilities operation.
+ * This queries the underlying zephyr video device for supported formats and the resolution, then
+ * translates them into the Greybus ExtCSI payload format, and dynamically allocates the response
+ * buffer to send back
  *
- * This operation retrieves the list of capabilities of the Camera Module and
- * then returns to host.
+ * @note Currently, this translation explicitly maps only the JPEG format (VIDEO_PX_FMT_JPEG) and
+ * stubs the framerate to a default 30fps. Support for mapping additional Zephyr pixel formats to
+ * greybus formats should be expanded here in the future.
  *
- * @param operation Pointer to structure of Greybus operation.
- * @return GB_OP_SUCCESS on success, error code on failure.
+ * @param data- Pointer to camera driver data
+ * @param cport- The CPort number
+ * @param msg- Incoming greybus message request
  */
-static uint8_t gb_camera_capabilities(struct gb_operation *operation)
+static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
+				   const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_capabilities_response *response;
-	const uint8_t *caps;
-	size_t size;
-	int ret;
+	struct video_caps vcaps = {0};
+	struct gb_camera_csi_params *csi_header;
+	struct gb_camera_format_desc *format;
+	size_t payload_size;
+	size_t total_size;
+	uint8_t num_formats = 0;
+	int ret, i;
 
-	LOG_DBG("gb_camera_capabilities() + ");
-
-	if (info->state < STATE_UNCONFIGURED) {
-		LOG_DBG("state error %d ", info->state);
-		return GB_OP_INVALID;
+	if (data == NULL || data->info.state < STATE_UNCONFIGURED) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
 	}
 
-	/* Retrieve the capabilities and their size. */
-	ret = device_camera_capabilities(info->dev, &size, &caps);
+	ret = video_get_caps(data->dev, &vcaps);
 	if (ret) {
-		return gb_errno_to_op_result(ret);
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
 	}
 
-	if (size > GB_MAX_PAYLOAD_SIZE) {
-		return GB_OP_NO_MEMORY;
+	while (vcaps.format_caps[num_formats].pixelformat != 0) {
+		num_formats++;
+	}
+	if (num_formats == 0) {
+		LOG_ERR("No video formats found from device");
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
 	}
 
-	response = gb_operation_alloc_response(operation, sizeof(*response) + size);
+	payload_size = sizeof(struct gb_camera_csi_params) +
+		       (num_formats * sizeof(struct gb_camera_format_desc));
+	total_size = sizeof(*response) + payload_size;
+
+	response = gb_alloc(total_size);
 	if (!response) {
-		return GB_OP_NO_MEMORY;
+		gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
+		return;
 	}
+	memset(response, 0, total_size);
 
-	memcpy(response->capabilities, caps, size);
+	csi_header = (struct gb_camera_csi_params *)&response->capabilities[0];
+	format = (struct gb_camera_format_desc *)&response
+			 ->capabilities[sizeof(struct gb_camera_csi_params)];
 
-	LOG_DBG("gb_camera_capabilities() - ");
+	csi_header->num_formats = num_formats;
 
-	return GB_OP_SUCCESS;
-}
-
-struct csi_bus_config {
-	int fooey;
-};
-/**
- * @brief Configure camera module streams
- *
- * The Configure Streams operation configures or unconfigures the Camera Module
- * to prepare or stop video capture.
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_camera_configure_streams(struct gb_operation *operation)
-{
-	struct gb_camera_configure_streams_request *request;
-	struct gb_camera_configure_streams_response *response;
-	struct gb_stream_config_req *cfg_set_req;
-	struct gb_stream_config_resp *cfg_ans_resp;
-	struct streams_cfg_req *cfg_request;
-	struct streams_cfg_ans *cfg_answer;
-	struct csi_bus_config csi_cfg;
-	uint8_t num_streams;
-	uint8_t res_flags = 0;
-	int i, ret;
-
-	LOG_DBG("gb_camera_configure_streams() + ");
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message ");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	num_streams = request->num_streams;
-	LOG_DBG("num_streams = %d ", num_streams);
-	LOG_DBG("req flags = %d ", request->flags);
-
-	if (num_streams > MAX_STREAMS_NUM) {
-		return GB_OP_INVALID;
-	}
-
-	/* Check if the request is acceptable in the current state. */
-	if (num_streams == 0) {
-		if (info->state < STATE_UNCONFIGURED || info->state > STATE_CONFIGURED) {
-			return GB_OP_INVALID;
-		}
-	} else {
-		if (info->state != STATE_UNCONFIGURED) {
-			return GB_OP_INVALID;
-		}
-	}
-
-	/* Zero streams unconfigures the camera, move to the unconfigured state. */
-	if (num_streams == 0) {
-		info->state = STATE_UNCONFIGURED;
-
-		ret = device_camera_set_streams_cfg(info->dev, &num_streams, NULL, 0, NULL, NULL,
-						    NULL);
-		if (ret) {
-			return gb_errno_to_op_result(ret);
+	for (i = 0; i < num_formats; i++) {
+		/* Map Pixel Format (Zephyr V4L2-style macro -> Greybus macro) */
+		if (vcaps.format_caps[i].pixelformat == VIDEO_PIX_FMT_JPEG) {
+			format[i].format = sys_cpu_to_le32(GB_CAMERA_CAP_FMT_JPEG);
+		} else {
+			format[i].format = sys_cpu_to_le32(0);
+			LOG_WRN("Unsupported pixel format found during translation");
 		}
 
-		response = gb_operation_alloc_response(operation, sizeof(*response));
-		return GB_OP_SUCCESS;
+		format[i].width = sys_cpu_to_le16(vcaps.format_caps[i].width_max);
+		format[i].height = sys_cpu_to_le16(vcaps.format_caps[i].height_max);
+		format[i].fps = sys_cpu_to_le16(30); // safe default
 	}
 
-	/* Otherwise pass stream configuration to the camera module. */
-	cfg_set_req = request->config;
-	cfg_request = malloc(num_streams * sizeof(*cfg_request));
-	if (!cfg_request) {
-		return GB_OP_NO_MEMORY;
-	}
+	gb_transport_message_response_success_send(msg, response, total_size, cport);
 
-	/* convert data for driver */
-	for (i = 0; i < num_streams; i++) {
-		LOG_DBG("   stream #%d", i);
-		cfg_request[i].width = sys_le16_to_cpu(cfg_set_req[i].width);
-		cfg_request[i].height = sys_le16_to_cpu(cfg_set_req[i].height);
-		cfg_request[i].format = sys_le16_to_cpu(cfg_set_req[i].format);
-		cfg_request[i].padding = sys_le16_to_cpu(cfg_set_req[i].padding);
-
-		LOG_DBG("    width = %d ", cfg_request[i].width);
-		LOG_DBG("    height = %d ", cfg_request[i].height);
-		LOG_DBG("    format = %d ", cfg_request[i].format);
-		LOG_DBG("    padding = %d ", cfg_request[i].padding);
-	}
-
-	/* alloc for getting answer from driver */
-	cfg_answer = malloc(MAX_STREAMS_NUM * sizeof(*cfg_answer));
-	if (!cfg_answer) {
-		ret = GB_OP_NO_MEMORY;
-		goto err_free_req_mem;
-	}
-
-	/* driver shall check the num_streams, it can't exceed its capability */
-	ret = device_camera_set_streams_cfg(info->dev, &num_streams, &csi_cfg, request->flags,
-					    cfg_request, &res_flags, cfg_answer);
-	if (ret) {
-		/* FIXME:
-		 * add greybus protocol error for EIO operations.
-		 * For now, return OP_INVALID
-		 */
-		LOG_DBG("Camera module reported error in configure stream %d", ret);
-		ret = GB_OP_INVALID;
-		goto err_free_ans_mem;
-	}
-
-	/*
-	 * If the requested format is not supported keep camera in un-configured
-	 * state;
-	 * Stay un-configured anyhow if AP is just testing format;
-	 * Move to configured otherwise
-	 */
-	if (res_flags & CAMERA_CONF_STREAMS_ADJUSTED) {
-		info->state = STATE_UNCONFIGURED;
-	} else if (request->flags & CAMERA_CONF_STREAMS_TEST_ONLY) {
-		info->state = STATE_UNCONFIGURED;
-	} else {
-		info->state = STATE_CONFIGURED;
-	}
-
-	/* Create and fill the greybus response. */
-	LOG_DBG("Resp: ");
-	response = gb_operation_alloc_response(
-		operation, sizeof(*response) + request->num_streams * sizeof(*cfg_ans_resp));
-	response->num_streams = num_streams;
-	response->flags = res_flags;
-	response->num_lanes = csi_cfg.num_lanes;
-	response->padding = 0;
-	response->bus_freq = sys_cpu_to_le32(csi_cfg.bus_freq);
-	response->lines_per_second = sys_cpu_to_le32(csi_cfg.lines_per_second);
-
-	LOG_DBG("flags = 0x%2x", response->flags);
-	LOG_DBG("lanes = %u", response->num_lanes);
-	LOG_DBG("freq = %u", csi_cfg.bus_freq);
-	LOG_DBG("lines = %u", csi_cfg.lines_per_second);
-
-	for (i = 0; i < num_streams; i++) {
-		cfg_ans_resp = &response->config[i];
-
-		LOG_DBG("");
-		LOG_DBG("    width = %d ", cfg_answer[i].width);
-		LOG_DBG("    height = %d ", cfg_answer[i].height);
-		LOG_DBG("    format = %d ", cfg_answer[i].format);
-		LOG_DBG("    virtual_channel = %d ", cfg_answer[i].virtual_channel);
-		LOG_DBG("    data_type = %d ", cfg_answer[i].data_type);
-		LOG_DBG("    max_size = %d ", cfg_answer[i].max_size);
-
-		cfg_ans_resp->width = sys_cpu_to_le16(cfg_answer[i].width);
-		cfg_ans_resp->height = sys_cpu_to_le16(cfg_answer[i].height);
-		cfg_ans_resp->format = sys_cpu_to_le16(cfg_answer[i].format);
-		cfg_ans_resp->virtual_channel = cfg_answer[i].virtual_channel;
-
-		/*
-		 * FIXME
-		 * The API towards the camera driver supports a single data type
-		 * for now, always return NOT_USED for the second data type
-		 */
-		cfg_ans_resp->data_type[0] = cfg_answer[i].data_type;
-		cfg_ans_resp->data_type[1] = GB_CAM_DT_NOT_USED;
-
-		cfg_ans_resp->padding[0] = 0;
-		cfg_ans_resp->padding[1] = 0;
-		cfg_ans_resp->padding[2] = 0;
-		cfg_ans_resp->max_size = sys_cpu_to_le32(cfg_answer[i].max_size);
-	}
-
-	ret = GB_OP_SUCCESS;
-
-err_free_ans_mem:
-	free(cfg_answer);
-err_free_req_mem:
-	free(cfg_request);
-
-	LOG_DBG("gb_camera_configure_streams() %d - ", ret);
-	return ret;
+	gb_free(response);
 }
 
 /**
- * @brief Engage camera capture operation
- *
- * It tell camera module to start capture.
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
+ * @brief Handler for the configure streams operation
+ * @param cport- the CPort number
+ * @param msg- incoming gb message request
+ * @param data- pointer to camera driver data
  */
-static uint8_t gb_camera_capture(struct gb_operation *operation)
+static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
 {
-	struct gb_camera_capture_request *request;
-	struct capture_info *capt_req;
-	size_t request_size;
-	int ret;
+    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+    struct video_format fmt;
+    int ret;
 
-	LOG_DBG("gb_camera_capture() + ");
+    if (drv_data == NULL || drv_data->info.state < STATE_UNCONFIGURED) {
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
 
-	if (info->state != STATE_CONFIGURED && info->state != STATE_STREAMING) {
-		return GB_OP_INVALID;
-	}
+    /*TODO- Parse the requested resolution from the incoming msg payload */
+    /*for now, we are hardcoding to a format that we know the driver supports */
+    fmt.pixelformat = VIDEO_PIX_FMT_JPEG;
+    fmt.width = 640;
+    fmt.height = 480;
+    fmt.pitch = 640 * 2; 
 
-	request_size = gb_operation_get_request_payload_size(operation);
-	if (request_size < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
+    ret = video_set_format(drv_data->dev, &fmt);
+    if (ret) {
+        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+        return;
+    }
 
-	request = gb_operation_get_request_payload(operation);
+    drv_data->info.state = STATE_CONFIGURED;
 
-	if (request->padding != 0) {
-		LOG_ERR("invalid padding value");
-		return GB_OP_INVALID;
-	}
-
-	capt_req = malloc(sizeof(*capt_req));
-	if (!capt_req) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	capt_req->request_id = sys_le32_to_cpu(request->request_id);
-	capt_req->streams = request->streams;
-	capt_req->num_frames = sys_le32_to_cpu(request->num_frames);
-	capt_req->settings = request->settings;
-	capt_req->settings_size = request_size - sizeof(*request);
-
-	LOG_DBG("    request_id = %d ", capt_req->request_id);
-	LOG_DBG("    streams = %d ", capt_req->streams);
-	LOG_DBG("    num_frames = %d ", capt_req->num_frames);
-	LOG_DBG("    settings_size = %u", capt_req->settings_size);
-
-	ret = device_camera_capture(info->dev, capt_req);
-	if (ret) {
-		LOG_ERR("error in camera capture thread. ");
-		ret = gb_errno_to_op_result(ret);
-		goto err_free_mem;
-	}
-
-	free(capt_req);
-
-	LOG_DBG("gb_camera_capture() - ");
-
-	return GB_OP_SUCCESS;
-
-err_free_mem:
-	free(capt_req);
-	return ret;
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 /**
- * @brief Flush the camera capture
- *
- * The Flush operation calls camera driver to flush capture.
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
+ * @brief Handler for the capture operation.
+ * @param cport- the CPort number
+ * @param msg- incoming gb message request
+ * @param data- pointer to camera driver data
  */
-static uint8_t gb_camera_flush(struct gb_operation *operation)
+static void gb_camera_capture(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
 {
-	struct gb_camera_flush_response *response;
-	uint32_t request_id = 0;
-	int ret;
+    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+    struct video_buffer *vbuf;
+    int ret;
 
-	LOG_DBG("gb_camera_flush() + ");
+    if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
 
-	if (info->state != STATE_STREAMING && info->state != STATE_CONFIGURED) {
-		return GB_OP_INVALID;
-	}
+    if (drv_data->info.state != STATE_STREAMING) {
+        ret = video_stream_start(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
+        if (ret) {
+            gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+            return;
+        }
+        drv_data->info.state = STATE_STREAMING;
+    }
 
-	ret = device_camera_flush(info->dev, &request_id);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
+    ret = video_dequeue(drv_data->dev, &vbuf, K_MSEC(1000)); // Removed VIDEO_EP_OUT
+    if (ret) {
+        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+        return;
+    }
 
-	info->state = STATE_CONFIGURED;
+    /*TODO- Dynamically allocate gb response msg, copy vbuf->buffer 
+     *(size:vbuf->bytesused) into it send it back to the host */
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->request_id = sys_cpu_to_le32(request_id);
-	LOG_DBG("    request_id = %d + ", request_id);
-
-	LOG_DBG("gb_camera_flush() + ");
-
-	return GB_OP_SUCCESS;
+    video_enqueue(drv_data->dev, vbuf);
+  
+    /*stub: sending empty success until the payload packing is done */
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 /**
- * @brief Greybus Camera Protocol initialize function
- *
- * This function performs the protocol inintilization, such as open the
- * cooperation device driver and create buffers etc.
- *
- * @param cport CPort number
- * @param bundle Greybus bundle handle
- * @return 0 on success, negative errno on error
+ * @brief Handler for the flush operation
+ * @param cport- the CPort number
+ * @param msg- incoming gb message request
+ * @param data- Pointer to camera driver data
  */
-static int gb_camera_init(unsigned int cport, struct gb_bundle *bundle)
+static void gb_camera_flush(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
 {
-	int ret;
+    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
 
-	LOG_DBG("gb_camera_init + ");
+    if (drv_data == NULL || drv_data->info.state < STATE_STREAMING) {
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
 
-	info = zalloc(sizeof(*info));
-	if (info == NULL) {
-		return -ENOMEM;
-	}
+    video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT); 
 
-	info->cport = cport;
+    video_flush(drv_data->dev, true);
 
-	info->state = STATE_INSERTED;
+    drv_data->info.state = STATE_CONFIGURED;
 
-	info->dev = device_open(DEVICE_TYPE_CAMERA_HW, 0);
-	if (!info->dev) {
-		return -EIO;
-		goto err_free_info;
-	}
-
-	info->state = STATE_UNCONFIGURED;
-
-	LOG_DBG("gb_camera_init - ");
-
-	return 0;
-
-err_free_info:
-	free(info);
-
-	return ret;
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 /**
- * @brief Greybus Camera Protocol deinitialize function
- *
- * This function is called when protocol terminated.
- *
- * @param cport CPort number
- * @param bundle Greybus bundle handle
- * @return None.
+ * @brief Callback invoked when the greybus host connects to the cemra cport
+ * Initializes camera protocol state and binds the Zephyr video device.
+ * @param priv- Private driver data pointer
+ * @param cport- The CPort number that was connected.
  */
-static void gb_camera_exit(unsigned int cport, struct gb_bundle *bundle)
+static void gb_camera_connected(const void *priv, uint16_t cport)
 {
-	DEBUGASSERT(cport == info->cport);
+	struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
 
-	device_close(info->dev);
+	if (!data) {
+		LOG_ERR("No driver data provided in priv!");
+		return;
+	}
 
-	free(info);
-	info = NULL;
+	memset(&data->info, 0, sizeof(data->info));
+
+	if (!device_is_ready(data->dev)) {
+		LOG_ERR("Camera device not ready");
+		return;
+	}
+
+	data->info.state = STATE_UNCONFIGURED;
 }
 
 /**
- * @brief Greybus Camera Protocol operation handler
+ * @brief Callbak invoked when the greybus host disconnects.
+ * Frees memory resources and also resets the camera states
+ * @param priv- Private driver data pointer
  */
-static uint8_t gb_camera_handler(uint8_t type, struct gb_operation *opr)
+static void gb_camera_disconnected(const void *priv)
 {
-	switch (type) {
+	struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
+
+	if (data) {
+		data->info.state = STATE_REMOVED;
+	}
+}
+
+/**
+ * @brief Main operation handler for the Greybus camera class
+ * Routes the inoming greybus messages to their specific handlers based on the operation type.
+ * @param priv- Private driver data pointer
+ * @param msg- Incoming greybus message request
+ * @param cport- The CPort number
+ */
+static void gb_camera_handler(const void *priv, struct gb_message *msg, uint16_t cport)
+{
+	const struct gb_camera_driver_data *data = priv;
+
+	switch (gb_message_type(msg)) {
 	case GB_CAMERA_TYPE_PROTOCOL_VERSION:
-		return gb_camera_protocol_version(opr);
+		gb_camera_protocol_version(cport, msg);
+		break;
 	case GB_CAMERA_TYPE_CAPABILITIES:
-		return gb_camera_capabilities(opr);
-	case GB_CAMERA_TYPE_CONFIGURE_STREAMS:
-		return gb_camera_configure_streams(opr);
-	case GB_CAMERA_TYPE_CAPTURE:
-		return gb_camera_capture(opr);
-	case GB_CAMERA_TYPE_FLUSH:
-		return gb_camera_flush(opr);
+		gb_camera_capabilities(cport, msg, data);
+		break;
+  case GB_CAMERA_TYPE_CONFIGURE_STREAMS:
+    gb_camera_configure_streams(cport, msg, data);
+    break;
+   case GB_CAMERA_TYPE_CAPTURE:
+     gb_camera_capture(cport, msg, data);
+        break;
+    case GB_CAMERA_TYPE_FLUSH:
+        gb_camera_flush(cport, msg, data);
+        break;
 	default:
-		LOG_ERR("Invalid type");
-		return GB_OP_INVALID;
+		LOG_ERR("Invalid type: %d", gb_message_type(msg));
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		break;
 	}
 }
 
-/**
- * @brief Greybus Camera Protocol driver ops
- */
-static struct gb_driver gb_camera_driver = {
-	.init = gb_camera_init,
-	.exit = gb_camera_exit,
+const struct gb_driver gb_camera_driver = {
+	.connected = gb_camera_connected,
+	.disconnected = gb_camera_disconnected,
 	.op_handler = gb_camera_handler,
 };
-
-/**
- * @brief Register Greybus Camera Protocol
- *
- * @param cport CPort number.
- * @param bundle Bundle number.
- */
-void gb_camera_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gb_camera_driver);
-}
